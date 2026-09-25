@@ -3,17 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { regionsToPathData } from "@/lib/export";
 import type { LetterTemplate } from "@/lib/templates";
+import type { HandlePlacement } from "@/lib/handle";
 import { cn } from "@/lib/utils";
 
 interface LetterCardProps {
   template: LetterTemplate;
+  handle: HandlePlacement | null;
   copies: number;
   onCopiesChange: (n: number) => void;
   onDownload: () => void;
   tooBig: boolean;
 }
 
-export function LetterCard({ template, copies, onCopiesChange, onDownload, tooBig }: LetterCardProps) {
+export function LetterCard({ template, handle, copies, onCopiesChange, onDownload, tooBig }: LetterCardProps) {
   const pad = Math.max(template.width, template.height) * 0.08;
   return (
     <div className={cn("flex flex-col rounded-xl border bg-card p-3 shadow-xs", tooBig && "border-destructive/60")}>
@@ -32,6 +34,16 @@ export function LetterCard({ template, copies, onCopiesChange, onDownload, tooBi
             stroke="rgba(0,0,0,.35)"
             strokeWidth={Math.max(template.width, template.height) / 200}
           />
+          {handle && (
+            <circle
+              cx={handle.x}
+              cy={template.height - handle.y}
+              r={handle.radius}
+              fill="rgba(255,255,255,.9)"
+              stroke="rgba(0,0,0,.35)"
+              strokeWidth={Math.max(template.width, template.height) / 200}
+            />
+          )}
         </svg>
         {template.pieces > 1 && (
           <Tooltip>

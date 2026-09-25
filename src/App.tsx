@@ -4,6 +4,7 @@ import {
   Box,
   Download,
   FileArchive,
+  Hand,
   LayoutGrid,
   Loader2,
   Moon,
@@ -32,7 +33,8 @@ import { SliderField } from "@/components/SliderField";
 import { usePacking } from "@/hooks/usePacking";
 import { BUNDLED_FONTS, loadFont, type FontChoice } from "@/lib/fonts";
 import { downloadBlob, meshToStl, meshesTo3mf, regionsToPathData, zipFiles } from "@/lib/export";
-import { extrudeRegions, mergeMeshes } from "@/lib/mesh";
+import { mergeMeshes } from "@/lib/mesh";
+import { handleVolume, placeHandle, templateSolid, type HandleSettings } from "@/lib/handle";
 import type { NestOptions } from "@/lib/nest";
 import { printPaperTemplates } from "@/lib/paper";
 import { buildPlates, type PlateLayout } from "@/lib/plates";
@@ -58,6 +60,7 @@ interface Settings extends TemplateSettings {
   margin: number;
   spacing: number;
   allowRotation: boolean;
+  handle: HandleSettings;
 }
 
 const DEFAULTS: Settings = {
@@ -78,6 +81,7 @@ const DEFAULTS: Settings = {
   margin: 5,
   spacing: 3,
   allowRotation: true,
+  handle: { enabled: false, diameter: 12, height: 15 },
 };
 
 const STORAGE_KEY = "applique-letters:v1";
@@ -87,7 +91,7 @@ function loadSettings(): Settings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULTS;
     const saved = JSON.parse(raw) as Partial<Settings>;
-    const merged = { ...DEFAULTS, ...saved };
+    const merged = { ...DEFAULTS, ...saved, handle: { ...DEFAULTS.handle, ...saved.handle } };
     // Bundled font URLs change between builds, so always use the current entry.
     if (merged.font?.source === "bundled") merged.font = BUNDLED_FONTS.find((f) => f.key === merged.font.key) ?? DEFAULTS.font;
     if (merged.font?.source === "upload") merged.font = DEFAULTS.font;
@@ -248,14 +252,25 @@ export default function App() {
     (packing.result?.unplaced ?? []).map((u) => packing.templates[u.shape]?.char).filter(Boolean) as string[],
   );
   const totalPieces = items.length;
+  const handle = settings.handle;
+  const handles = useMemo(
+    () => new Map(templates.map((t) => [t.char, placeHandle(t.regions, handle)])),
+    [templates, handle],
+  );
+  const reducedHandles = templates.filter((t) => handles.get(t.char)?.reduced).map((t) => t.char);
   const grams =
-    (templates.reduce((s, t) => s + t.area * copiesFor(t.char), 0) * thickness * PLA_DENSITY) / 1000;
+    (templates.reduce((s, t) => {
+      const h = handles.get(t.char);
+      return s + (t.area * thickness + (h ? handleVolume(h, handle.height) : 0)) * copiesFor(t.char);
+    }, 0) *
+      PLA_DENSITY) /
+    1000;
   const stale = packing.running || packing.templates !== templates;
 
   const plateObjects = (plate: PlateLayout) =>
     plate.letters.map((l) => ({
       name: l.copy > 1 ? `${l.template.char} (${l.copy})` : l.template.char,
-      mesh: extrudeRegions(l.regions, thickness),
+      mesh: templateSolid(l.regions, thickness, handle),
     }));
 
   const fileBase = () => {
@@ -310,7 +325,7 @@ export default function App() {
         );
       }
       for (const t of templates) {
-        files[`letters/${t.slug}.stl`] = meshToStl(extrudeRegions(t.regions, thickness), t.char);
+        files[`letters/${t.slug}.stl`] = meshToStl(templateSolid(t.regions, thickness, handle), t.char);
       }
       files["README.txt"] = new TextEncoder().encode(
         [
@@ -318,6 +333,9 @@ export default function App() {
           `Font: ${settings.font.family} (${settings.font.weight})`,
           `Capital letter height: ${settings.letterHeight} mm, outline offset: ${settings.outlineOffset} mm`,
           `Thickness: ${thickness} mm (${settings.layers} layers of ${settings.layerHeight} mm)`,
+          handle.enabled
+            ? `Grip handle: ${handle.diameter} mm across, ${handle.height} mm tall`
+            : "Grip handle: none",
           `Plates: ${plates.length} for a ${bed.width} × ${bed.depth} mm bed`,
           "",
           "plates/   Ready-to-print plates. Open the .3mf files in Bambu Studio, OrcaSlicer or PrusaSlicer;",
@@ -465,6 +483,48 @@ export default function App() {
               <p className="-mt-2 text-xs text-muted-foreground">
                 Mirroring is handy for paper templates traced onto fusible web, which needs reversed letters.
               </p>
+              <div className="space-y-4 rounded-lg bg-muted/50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="handle" className="flex items-center gap-1.5">
+                      <Hand className="size-4 text-muted-foreground" /> Grip handle
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Adds a knob near the middle of each letter, so it can be held flat with one fingertip while you
+                      trace. Ideal if spreading your fingers is difficult.
+                    </p>
+                  </div>
+                  <Switch
+                    id="handle"
+                    checked={handle.enabled}
+                    onCheckedChange={(v) => set("handle", { ...handle, enabled: v })}
+                  />
+                </div>
+                {handle.enabled && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <SliderField
+                      id="handle-diameter"
+                      label="Diameter"
+                      value={handle.diameter}
+                      min={6}
+                      max={25}
+                      step={1}
+                      onChange={(v) => set("handle", { ...handle, diameter: v })}
+                      display={`${handle.diameter} mm`}
+                    />
+                    <SliderField
+                      id="handle-height"
+                      label="Height"
+                      value={handle.height}
+                      min={6}
+                      max={40}
+                      step={1}
+                      onChange={(v) => set("handle", { ...handle, height: v })}
+                      display={`${handle.height} mm`}
+                    />
+                  </div>
+                )}
+              </div>
             </StepCard>
 
             <StepCard step={4} icon={Printer} title="Printer">
@@ -576,10 +636,23 @@ export default function App() {
                 value={`${grams < 10 ? grams.toFixed(1) : Math.round(grams)} g`}
                 sub="Estimated, in PLA"
               />
-              <Stat label="Thickness" value={`${thickness} mm`} sub={`${settings.layers} × ${settings.layerHeight} mm layers`} />
+              <Stat
+                label="Thickness"
+                value={`${thickness} mm`}
+                sub={
+                  handle.enabled
+                    ? `+ ${handle.height} mm grip handle`
+                    : `${settings.layers} × ${settings.layerHeight} mm layers`
+                }
+              />
             </div>
 
-            {(missing.length > 0 || tooBig.size > 0 || packing.error || actionError || fontLoading) && (
+            {(missing.length > 0 ||
+              tooBig.size > 0 ||
+              reducedHandles.length > 0 ||
+              packing.error ||
+              actionError ||
+              fontLoading) && (
               <div className="space-y-2">
                 {fontLoading && (
                   <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground">
@@ -592,6 +665,16 @@ export default function App() {
                     <span>
                       {settings.font.family} has no {missing.map((m) => `“${m}”`).join(", ")}, so{" "}
                       {missing.length === 1 ? "it has" : "they have"} been left out.
+                    </span>
+                  </div>
+                )}
+                {reducedHandles.length > 0 && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+                    <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                    <span>
+                      {reducedHandles.join(", ")} {reducedHandles.length === 1 ? "is" : "are"} too narrow for a{" "}
+                      {handle.diameter} mm handle, so {reducedHandles.length === 1 ? "its handle has" : "their handles have"}{" "}
+                      been made thinner. A bolder font or bigger letters give room for a chunkier grip.
                     </span>
                   </div>
                 )}
@@ -654,6 +737,7 @@ export default function App() {
                             plate={p}
                             bed={bed}
                             margin={settings.margin}
+                            handle={handle}
                             selected={plates.length > 1 && p.index === selectedPlate}
                             onSelect={() => setSelectedPlate(p.index)}
                             className={stale ? "opacity-70" : undefined}
@@ -673,7 +757,7 @@ export default function App() {
                             </div>
                           }
                         >
-                          <Plate3D plate={current} bed={bed} thickness={thickness} />
+                          <Plate3D plate={current} bed={bed} thickness={thickness} handle={handle} />
                         </Suspense>
                         <p className="text-xs text-muted-foreground">Drag to orbit, scroll or pinch to zoom.</p>
                       </div>
@@ -692,12 +776,13 @@ export default function App() {
                             <LetterCard
                               key={t.char}
                               template={t}
+                              handle={handles.get(t.char) ?? null}
                               copies={copiesFor(t.char)}
                               onCopiesChange={(n) => setCopies(t.char, n)}
                               tooBig={tooBig.has(t.char)}
                               onDownload={() =>
                                 run(() =>
-                                  downloadBlob(meshToStl(extrudeRegions(t.regions, thickness), t.char), `${t.slug}.stl`, "model/stl"),
+                                  downloadBlob(meshToStl(templateSolid(t.regions, thickness, handle), t.char), `${t.slug}.stl`, "model/stl"),
                                 )
                               }
                             />
@@ -773,6 +858,11 @@ export default function App() {
                   <li>
                     <strong className="text-foreground">Pinking shears.</strong> Cutting just outside the line with pinking
                     shears stops raw edges fraying; leave the seam allowance at 0.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">Grip handles.</strong> Press straight down on the knob with one
+                    finger and trace all the way round without letting go. With handles on, flip-tracing a mirrored
+                    letter is not possible, so use the Mirror letters option and print a second set instead.
                   </li>
                   <li>
                     <strong className="text-foreground">Fusible web.</strong> Letters go on the paper backing reversed. Trace

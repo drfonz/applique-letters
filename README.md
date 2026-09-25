@@ -17,6 +17,10 @@ It is a static site: no server, no account, nothing uploaded anywhere.
   the 1,800+ Google Fonts at any weight, or upload your own TTF, OTF or WOFF file.
 - **Sizes that make sense for sewing.** Letter height is the capital height, so every letter in a set matches. Add a
   seam allowance for needle-turn appliqué, or mirror the letters for fusible web.
+- **Grip handle (optional).** A knob near the middle of each letter lets the template be held flat with a single
+  fingertip while tracing, which helps anyone who finds spreading their fingers difficult. It is placed on solid
+  material close to the letter's centre of mass, never overhangs the outline, prints upright without supports, and
+  is made thinner automatically on narrow letters.
 - **Plate optimiser.** Letters are nested by their real outlines (not bounding boxes) and rotated in quarter turns to
   interlock, then a local search tries hundreds of orderings to **minimise the number of build plates**. It shows the
   theoretical minimum so you know how close it got.
@@ -66,6 +70,7 @@ src/
     geometry.ts   glyph flattening, polygon clean-up and offsetting, built-in shapes
     templates.ts  builds a template (outline) for each character
     mesh.ts       watertight extrusion
+    handle.ts     optional grip handle: placement and solid
     nest.ts       plate optimiser (runs in nest.worker.ts)
     export.ts     STL, 3MF, SVG and ZIP writers
     fonts.ts      bundled fonts and the Google Fonts catalogue

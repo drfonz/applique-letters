@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { boundsOf } from "@/lib/geometry";
 import { regionsToPathData } from "@/lib/export";
 import type { PlateLayout } from "@/lib/plates";
+import { placeHandle, type HandleSettings } from "@/lib/handle";
 import { cn } from "@/lib/utils";
 
 const COLOURS = ["var(--letter-1)", "var(--letter-2)", "var(--letter-3)", "var(--letter-4)", "var(--letter-5)"];
@@ -10,13 +11,14 @@ interface PlatePreviewProps {
   plate: PlateLayout;
   bed: { width: number; depth: number };
   margin: number;
+  handle?: HandleSettings;
   selected?: boolean;
   onSelect?: () => void;
   className?: string;
 }
 
 /** Top-down view of one build plate, drawn to scale. */
-export function PlatePreview({ plate, bed, margin, selected, onSelect, className }: PlatePreviewProps) {
+export function PlatePreview({ plate, bed, margin, handle, selected, onSelect, className }: PlatePreviewProps) {
   const shapes = useMemo(
     () =>
       plate.letters.map((l, i) => {
@@ -28,9 +30,10 @@ export function PlatePreview({ plate, bed, margin, selected, onSelect, className
           cy: bed.depth - (b.minY + b.maxY) / 2,
           colour: COLOURS[i % COLOURS.length],
           label: l.template.char,
+          handle: handle ? placeHandle(l.regions, handle) : null,
         };
       }),
-    [plate, bed.depth],
+    [plate, bed.depth, handle],
   );
   const grid = 32;
   return (
@@ -64,6 +67,19 @@ export function PlatePreview({ plate, bed, margin, selected, onSelect, className
         {shapes.map((s) => (
           <g key={s.key}>
             <path d={s.d} fill={s.colour} fillRule="evenodd" stroke="rgba(0,0,0,.35)" strokeWidth="0.5" />
+            {s.handle && (
+              <>
+                <circle cx={s.handle.x} cy={bed.depth - s.handle.y} r={s.handle.footRadius} fill="rgba(0,0,0,.18)" />
+                <circle
+                  cx={s.handle.x}
+                  cy={bed.depth - s.handle.y}
+                  r={s.handle.radius}
+                  fill="rgba(255,255,255,.85)"
+                  stroke="rgba(0,0,0,.35)"
+                  strokeWidth="0.5"
+                />
+              </>
+            )}
           </g>
         ))}
       </svg>

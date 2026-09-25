@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { PlateLayout } from "@/lib/plates";
-import { extrudeRegions } from "@/lib/mesh";
+import { templateSolid, type HandleSettings } from "@/lib/handle";
 
 const COLOURS = [0xe87a93, 0xe8b46a, 0x7fc59a, 0x78a6e0, 0xb48be0];
 
@@ -10,10 +10,11 @@ interface Plate3DProps {
   plate: PlateLayout;
   bed: { width: number; depth: number };
   thickness: number;
+  handle: HandleSettings;
 }
 
 /** Interactive 3D view of a build plate (drag to orbit, scroll to zoom). */
-export function Plate3D({ plate, bed, thickness }: Plate3DProps) {
+export function Plate3D({ plate, bed, thickness, handle }: Plate3DProps) {
   const mountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,7 +61,7 @@ export function Plate3D({ plate, bed, thickness }: Plate3DProps) {
     scene.add(grid);
 
     plate.letters.forEach((letter, i) => {
-      const mesh = extrudeRegions(letter.regions, thickness);
+      const mesh = templateSolid(letter.regions, thickness, handle);
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(mesh.positions, 3));
       geo.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
@@ -95,7 +96,7 @@ export function Plate3D({ plate, bed, thickness }: Plate3DProps) {
       renderer.dispose();
       mount.removeChild(renderer.domElement);
     };
-  }, [plate, bed.width, bed.depth, thickness]);
+  }, [plate, bed.width, bed.depth, thickness, handle]);
 
   return <div ref={mountRef} className="h-[420px] w-full overflow-hidden rounded-xl bg-muted/60 sm:h-[520px]" />;
 }

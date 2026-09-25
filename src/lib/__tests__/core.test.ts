@@ -156,3 +156,63 @@ function intersectionArea(a: Region[], b: Region[], grow: number): number {
   const regions: Region[] = out.map((p) => ({ outer: p.map((q) => [q.X / 1000, q.Y / 1000] as [number, number]), holes: [] }));
   return regions.reduce((s, r) => s + Math.abs(regionArea(r)), 0) > 0.5 ? 1 : 0;
 }
+
+import { handleMesh, placeHandle, templateSolid } from "../handle";
+
+describe("grip handle", () => {
+  const settings = { enabled: true, diameter: 12, height: 15 };
+
+  it("sits on solid material, clear of every edge, for every capital", () => {
+    const { templates } = buildTemplates(fredoka, ALPHABET, base);
+    for (const t of templates) {
+      const h = placeHandle(t.regions, settings)!;
+      expect(h, t.char).not.toBeNull();
+      // Sample the foot circle: every point must be inside the letter and not in a hole.
+      const main = t.regions.reduce((a, b) => (regionArea(b) > regionArea(a) ? b : a));
+      for (let k = 0; k < 32; k++) {
+        const a = (k / 32) * Math.PI * 2;
+        const p: [number, number] = [h.x + h.footRadius * Math.cos(a), h.y + h.footRadius * Math.sin(a)];
+        expect(insideRegion(p, main), `${t.char} foot point ${k}`).toBe(true);
+      }
+    }
+  });
+
+  it("avoids the counter of an O and shrinks on narrow strokes", () => {
+    const o = buildTemplates(fredoka, ["O"], base).templates[0];
+    const h = placeHandle(o.regions, settings)!;
+    const hole = o.regions[0].holes[0];
+    expect(insideRegion([h.x, h.y], { outer: hole, holes: [] })).toBe(false);
+
+    const thin = buildTemplates(fredoka, ["I"], { ...base, letterHeight: 40 }).templates[0];
+    const small = placeHandle(thin.regions, settings)!;
+    expect(small.reduced).toBe(true);
+    expect(small.radius).toBeLessThan(6);
+  });
+
+  it("produces closed solids that stand on the template", () => {
+    const t = buildTemplates(fredoka, ["A"], base).templates[0];
+    const h = placeHandle(t.regions, settings)!;
+    const post = handleMesh(h, 1.2, 15);
+    expect(isWatertight(post.indices)).toBe(true);
+    expect(meshVolume(post)).toBeGreaterThan(0);
+    let top = 0;
+    for (let i = 2; i < post.positions.length; i += 3) top = Math.max(top, post.positions[i]);
+    expect(top).toBeCloseTo(16.2, 3);
+
+    const solid = templateSolid(t.regions, 1.2, settings);
+    expect(isWatertight(solid.indices)).toBe(true);
+    expect(templateSolid(t.regions, 1.2, { ...settings, enabled: false }).indices.length).toBeLessThan(solid.indices.length);
+  });
+});
+
+function insideRegion([px, py]: [number, number], region: Region): boolean {
+  let inside = false;
+  for (const ring of [region.outer, ...region.holes]) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i];
+      const [xj, yj] = ring[j];
+      if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
