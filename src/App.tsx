@@ -35,7 +35,7 @@ const LAYER_HEIGHTS = [0.12, 0.16, 0.2, 0.28];
 const TIPS = [
   {
     title: "Slicing.",
-    body: "Open the .3mf, pick your filament and press print. Thin templates need no supports; a textured PEI plate gives a grippy underside.",
+    body: "Open the .3mf, pick your filament and press print. Thin templates need no supports; a textured PEI plate gives a grippy underside. If Bambu Studio says the file has an “invalid config”, click OK: the file only carries the letters, so your own settings are kept.",
   },
   {
     title: "Tracing.",
@@ -1100,6 +1100,10 @@ function PlateDetails({
       </div>
       <p className="text-xs leading-normal text-pretty text-muted-foreground">
         Every letter is its own object in Bambu Studio, OrcaSlicer or PrusaSlicer.
+      </p>
+      <p className="text-xs leading-normal text-pretty text-muted-foreground">
+        Bambu Studio 2.8.2 may warn that the file has an “invalid config”. That’s expected: click OK and the letters
+        load with your own printer and filament settings.
       </p>
     </div>
   );
