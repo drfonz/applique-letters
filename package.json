@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
+  "author": "Indigo Labs Studio (https://indigolabs.studio)",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -8,6 +8,8 @@ work beautifully), and stitch the letters onto your backing fabric.
 
 It is a static site: no server, no account, nothing uploaded anywhere.
 
+Made by [Indigo Labs Studio](https://indigolabs.studio).
+
 ## Features
 
 - **Any letters you like.** Type banner words ("HAPPY BIRTHDAY") or pick a subset of A–Z, a–z, 0–9 and symbols.
@@ -96,6 +98,6 @@ Ideas, bug reports and pull requests are very welcome. Some things on the wish l
 
 ## Licence
 
-Code: [MIT](LICENSE). The bundled fonts are from [Google Fonts](https://fonts.google.com) via
-[Fontsource](https://fontsource.org) and are released under the SIL Open Font License; the fonts' own licences apply
-to them.
+Code: [MIT](LICENSE), © 2026 [Indigo Labs Studio](https://indigolabs.studio) and contributors. The bundled fonts are
+from [Google Fonts](https://fonts.google.com) via [Fontsource](https://fontsource.org) and are released under the SIL
+Open Font License; the fonts' own licences apply to them.
