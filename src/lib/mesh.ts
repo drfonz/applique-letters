@@ -37,15 +37,28 @@ export function extrudeRegions(regions: Region[], thickness: number, offset: Vec
       at += h.length;
     }
     const tris = earcut(flat.flat(), holeStarts, 2);
+    const cross = (f: number) => {
+      const pa = flat[tris[f]];
+      const pb = flat[tris[f + 1]];
+      const pc = flat[tris[f + 2]];
+      return (pb[0] - pa[0]) * (pc[1] - pa[1]) - (pb[1] - pa[1]) * (pc[0] - pa[0]);
+    };
+    // Earcut winds every triangle the same way. Take that winding from the first triangle with
+    // real area: zero-area slivers (from collinear edges) have no winding of their own, and
+    // flipping them independently would leave the cap with mismatched edges.
+    let earcutCcw = true;
+    for (let f = 0; f < tris.length; f += 3) {
+      const c = cross(f);
+      if (Math.abs(c) > 1e-9) {
+        earcutCcw = c > 0;
+        break;
+      }
+    }
     for (let f = 0; f < tris.length; f += 3) {
       const a = tris[f];
       const b = tris[f + 1];
       const c = tris[f + 2];
-      const pa = flat[a];
-      const pb = flat[b];
-      const pc = flat[c];
-      const ccw = (pb[0] - pa[0]) * (pc[1] - pa[1]) - (pb[1] - pa[1]) * (pc[0] - pa[0]) > 0;
-      const [i, j, k] = ccw ? [a, b, c] : [a, c, b];
+      const [i, j, k] = earcutCcw ? [a, b, c] : [a, c, b];
       indices.push(base + count + i, base + count + j, base + count + k); // top faces up
       indices.push(base + i, base + k, base + j); // bottom faces down
     }
