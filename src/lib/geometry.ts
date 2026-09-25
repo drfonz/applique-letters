@@ -195,6 +195,36 @@ export function cleanAndOffset(rings: Vec2[][], offsetMm = 0): Region[] {
 }
 
 /** Height (font units) that "letter height" is measured against: the capital height. */
+/**
+ * Boolean operation between two sets of closed rings (non-zero fill), returning clean regions.
+ * Rings may be outers or holes; holes must wind the opposite way to their outer, as regions do.
+ */
+function clipRings(type: number, subject: Vec2[][], clip: Vec2[][]): Region[] {
+  const clipper = new ClipperLib.Clipper();
+  // Rings that touch at a single point confuse the triangulation, so ask for fully simple output.
+  clipper.StrictlySimple = true;
+  clipper.AddPaths(toClipper(subject), ClipperLib.PolyType.ptSubject, true);
+  clipper.AddPaths(toClipper(clip), ClipperLib.PolyType.ptClip, true);
+  const tree = new ClipperLib.PolyTree();
+  clipper.Execute(type, tree, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
+  return treeToRegions(tree);
+}
+
+/** The parts of `subject` not covered by `clip`. */
+export function differenceRegions(subject: Vec2[][], clip: Vec2[][]): Region[] {
+  return clipRings(ClipperLib.ClipType.ctDifference, subject, clip);
+}
+
+/** Everything covered by `a` or `b`. */
+export function unionRegions(a: Vec2[][], b: Vec2[][]): Region[] {
+  return clipRings(ClipperLib.ClipType.ctUnion, a, b);
+}
+
+/** Outer and hole rings of a set of regions, as one flat list. */
+export function regionRings(regions: Region[]): Vec2[][] {
+  return regions.flatMap((r) => [r.outer, ...r.holes]);
+}
+
 export function capHeightUnits(font: Font): number {
   const fromTable = font.tables.os2?.sCapHeight;
   if (fromTable && fromTable > 0) return fromTable;

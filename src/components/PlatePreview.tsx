@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { regionsToPathData } from "@/lib/export";
-import type { Vec2 } from "@/lib/geometry";
+import type { Region, Vec2 } from "@/lib/geometry";
 import type { HandlePlacement } from "@/lib/handle";
 import type { KeepOut } from "@/lib/nest";
 import type { PlacedLetter, PlateLayout } from "@/lib/plates";
@@ -14,6 +14,8 @@ interface PlatePreviewProps {
   margin: number;
   /** Each letter's grip handle in bed coordinates, if handles are on. */
   handleOf?: (letter: PlacedLetter) => HandlePlacement | null;
+  /** What each letter prints as, in bed coordinates, if not its plain outline. */
+  bodyOf?: (letter: PlacedLetter) => Region[];
   /** Makes handles draggable; called with the bed point the handle is dragged to. */
   onHandleMove?: (letter: PlacedLetter, point: Vec2) => void;
   /** Areas the nesting left clear, drawn hatched. */
@@ -29,6 +31,7 @@ export function PlatePreview({
   bed,
   margin,
   handleOf,
+  bodyOf,
   onHandleMove,
   keepOut = [],
   label,
@@ -42,11 +45,11 @@ export function PlatePreview({
     () =>
       plate.letters.map((l, i) => ({
         key: `${l.template.char}-${l.copy}-${i}`,
-        d: regionsToPathData(l.regions, bed.depth),
+        d: regionsToPathData(bodyOf ? bodyOf(l) : l.regions, bed.depth),
         colour: COLOURS[i % COLOURS.length],
         handle: handleOf ? handleOf(l) : null,
       })),
-    [plate, bed.depth, handleOf],
+    [plate, bed.depth, handleOf, bodyOf],
   );
   const grid = Math.max(bed.width, bed.depth) / 8;
   const stroke = Math.max(bed.width, bed.depth) / 500;

@@ -19,6 +19,9 @@ Made by [Indigo Labs Studio](https://indigolabs.studio).
   the 1,800+ Google Fonts at any weight, or upload your own TTF, OTF or WOFF file.
 - **Sizes that make sense for sewing.** Letter height is the capital height, so every letter in a set matches. Add a
   seam allowance for needle-turn appliqué, or mirror the letters for fusible web.
+- **Filament saver (on by default).** Each template is printed as a solid border to trace round, with an open
+  diagonal lattice inside to keep it flat and stiff. That uses roughly half the filament of a solid template; parts
+  too thin for a lattice stay solid, and so does the spot under a grip handle.
 - **Grip handle (optional).** A knob near the middle of each letter lets the template be held flat with a single
   fingertip while tracing, which helps anyone who finds spreading their fingers difficult. It is placed on solid
   material close to the letter's centre of mass, never overhangs the outline, prints upright without supports, and

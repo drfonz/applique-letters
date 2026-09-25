@@ -4,13 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { regionsToPathData } from "@/lib/export";
 import type { LetterTemplate } from "@/lib/templates";
-import type { Vec2 } from "@/lib/geometry";
+import type { Region, Vec2 } from "@/lib/geometry";
 import type { HandlePlacement } from "@/lib/handle";
 import { cn } from "@/lib/utils";
 
 interface LetterCardProps {
   template: LetterTemplate;
   handle: HandlePlacement | null;
+  /** What the letter prints as, if not its plain outline. */
+  body?: Region[];
   /** Makes the handle draggable; called with the template point it is dragged to. */
   onHandleMove?: (point: Vec2) => void;
   /** Shown when the handle has been moved by hand, to put it back in the automatic spot. */
@@ -24,6 +26,7 @@ interface LetterCardProps {
 export function LetterCard({
   template,
   handle,
+  body,
   onHandleMove,
   onHandleReset,
   copies,
@@ -74,7 +77,7 @@ export function LetterCard({
           ref={svgRef}
         >
           <path
-            d={regionsToPathData(template.regions, template.height)}
+            d={regionsToPathData(body ?? template.regions, template.height)}
             fill="var(--letter-1)"
             fillRule="evenodd"
             stroke="rgba(0,0,0,.35)"

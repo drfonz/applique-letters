@@ -8,7 +8,8 @@ import { meshToStl, meshesTo3mf } from "../export";
 import { nest, placedRegions } from "../nest";
 import { PRINTERS, keepOutAreas } from "../printers";
 import { bedToTemplate, buildPlates, templateToBed } from "../plates";
-import { boundsOf, regionArea } from "../geometry";
+import { boundsOf, differenceRegions, regionArea, regionRings } from "../geometry";
+import { latticeRegions } from "../lattice";
 
 function loadFont(file: string) {
   const buf = readFileSync(resolve(__dirname, "../../../node_modules/@fontsource", file));
@@ -328,3 +329,47 @@ function insideRegion([px, py]: [number, number], region: Region): boolean {
   }
   return inside;
 }
+
+describe("filament-saving lattice", () => {
+  const lattice = { enabled: true, border: 4, spacing: 10 };
+  const area = (rs: Region[]) => rs.reduce((a, r) => a + regionArea(r), 0);
+
+  it("keeps a solid border, opens the middle and stays printable, for every capital", () => {
+    const { templates } = buildTemplates(fredoka, ALPHABET, base);
+    let solid = 0;
+    let printed = 0;
+    for (const t of templates) {
+      const body = latticeRegions(t.regions, lattice);
+      solid += t.area;
+      printed += area(body);
+      // Everything removed lies at least the border width inside the outline.
+      const removed = differenceRegions(regionRings(t.regions), regionRings(body));
+      const inner = cleanAndOffset(regionRings(t.regions), -lattice.border + 0.05);
+      expect(area(differenceRegions(regionRings(removed), regionRings(inner))), t.char).toBeLessThan(0.01);
+      // The printed body is a closed solid.
+      expect(isWatertight(extrudeRegions(body, 1.2).indices), t.char).toBe(true);
+    }
+    console.log(`lattice: ${Math.round((1 - printed / solid) * 100)}% less filament across A–Z at 100 mm`);
+    expect(printed / solid).toBeLessThan(0.75);
+  });
+
+  it("keeps the spot under a grip handle solid and leaves thin letters alone", () => {
+    const o = buildTemplates(fredoka, ["O"], base).templates[0];
+    const spot = { x: o.width / 2, y: 8, radius: 5 };
+    const body = latticeRegions(o.regions, lattice, [spot]);
+    const pad = cleanAndOffset([
+      Array.from({ length: 24 }, (_, i) => {
+        const a = (i / 24) * Math.PI * 2;
+        return [spot.x + (spot.radius + 1.5) * Math.cos(a), spot.y + (spot.radius + 1.5) * Math.sin(a)] as [
+          number,
+          number,
+        ];
+      }),
+    ]);
+    expect(area(differenceRegions(regionRings(pad), regionRings(body)))).toBeLessThan(0.01);
+
+    const thin = buildTemplates(fredoka, ["I"], { ...base, letterHeight: 30 }).templates[0];
+    expect(latticeRegions(thin.regions, lattice)).toEqual(thin.regions);
+    expect(latticeRegions(o.regions, { ...lattice, enabled: false })).toEqual(o.regions);
+  });
+});

@@ -227,15 +227,17 @@ export function handleVolume(h: HandlePlacement, height: number): number {
 
 /**
  * A template as a printable solid: the flat letter plus, optionally, its handle. The handle
- * goes where `placement` says, or is placed automatically when it is left out.
+ * goes where `placement` says, or is placed automatically (on the outline) when it is left out.
  */
 export function templateSolid(
   regions: Region[],
   thickness: number,
   handle: HandleSettings,
   placement?: HandlePlacement | null,
+  /** What to extrude, if not the plain outline (e.g. the filament-saving lattice). */
+  body: Region[] = regions,
 ): Mesh {
-  const slab = extrudeRegions(regions, thickness);
+  const slab = extrudeRegions(body, thickness);
   const h = handle.enabled ? (placement === undefined ? placeHandle(regions, handle) : placement) : null;
   return h ? mergeMeshes([slab, handleMesh(h, thickness, handle.height)]) : slab;
 }

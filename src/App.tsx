@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Font } from "opentype.js";
 import { DropdownMenu, Popover } from "radix-ui";
 import { Loader2, TriangleAlert, Type, X } from "lucide-react";
@@ -24,12 +24,19 @@ import {
   type HandlePlacement,
   type HandleSettings,
 } from "@/lib/handle";
-import type { Vec2 } from "@/lib/geometry";
+import { regionArea, transformRegions, type Region, type Vec2 } from "@/lib/geometry";
+import { latticeRegions, type LatticeSettings } from "@/lib/lattice";
 import type { NestOptions } from "@/lib/nest";
 import { printPaperTemplates } from "@/lib/paper";
 import { bedToTemplate, buildPlates, templateToBed, type PlacedLetter, type PlateLayout } from "@/lib/plates";
 import { PRINTERS, keepOutAreas } from "@/lib/printers";
-import { buildTemplates, countCharacters, thicknessOf, type TemplateSettings } from "@/lib/templates";
+import {
+  buildTemplates,
+  countCharacters,
+  thicknessOf,
+  type LetterTemplate,
+  type TemplateSettings,
+} from "@/lib/templates";
 import { cn } from "@/lib/utils";
 
 // three.js is large, so the 3D view is only loaded when it is first opened.
@@ -84,6 +91,8 @@ interface Settings extends TemplateSettings {
   handle: HandleSettings;
   /** Handles moved by hand, per character, as fractions of the letter's width and height. */
   handlePositions: Record<string, [number, number]>;
+  /** Solid border with an open lattice inside, to save filament. */
+  lattice: LatticeSettings;
 }
 
 const DEFAULTS: Settings = {
@@ -107,6 +116,7 @@ const DEFAULTS: Settings = {
   primeTower: false,
   handle: { enabled: false, diameter: 12, height: 15 },
   handlePositions: {},
+  lattice: { enabled: true, border: 4, spacing: 10 },
 };
 
 const STORAGE_KEY = "applique-letters:v1";
@@ -116,7 +126,12 @@ function loadSettings(): Settings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULTS;
     const saved = JSON.parse(raw) as Partial<Settings>;
-    const merged = { ...DEFAULTS, ...saved, handle: { ...DEFAULTS.handle, ...saved.handle } };
+    const merged = {
+      ...DEFAULTS,
+      ...saved,
+      handle: { ...DEFAULTS.handle, ...saved.handle },
+      lattice: { ...DEFAULTS.lattice, ...saved.lattice },
+    };
     // Bundled font URLs change between builds, so always use the current entry.
     if (merged.font?.source === "bundled")
       merged.font = BUNDLED_FONTS.find((f) => f.key === merged.font.key) ?? DEFAULTS.font;
@@ -255,7 +270,12 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (view === "letters" || plates.length < 2 || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [role=slider], [role=listbox], [role=menu], [role=dialog], [data-handle]")) return;
+      if (
+        target?.closest(
+          "input, textarea, select, [role=slider], [role=listbox], [role=menu], [role=dialog], [data-handle]",
+        )
+      )
+        return;
       if (e.key === "ArrowRight") setSelectedPlate((i) => Math.min(plates.length - 1, i + 1));
       if (e.key === "ArrowLeft") setSelectedPlate((i) => Math.max(0, i - 1));
     };
@@ -332,11 +352,42 @@ export default function App() {
       return { ...s, handlePositions: rest };
     });
   const movedHandles = templates.filter((t) => settings.handlePositions[t.char]).map((t) => t.char);
+
+  // What actually prints for each character: the lattice (if on), solid under its handle.
+  // Letters whose inputs have not changed reuse their last result, so dragging one handle
+  // only recomputes that letter.
+  const lattice = settings.lattice;
+  const bodyCache = useRef(new Map<LetterTemplate, { key: string; body: Region[] }>());
+  const bodies = useMemo(() => {
+    const cache = new Map<LetterTemplate, { key: string; body: Region[] }>();
+    const result = new Map<string, Region[]>();
+    for (const t of templates) {
+      const h = handles.get(t.char);
+      const spots = h ? [{ x: h.x, y: h.y, radius: h.footRadius }] : [];
+      const key = JSON.stringify([lattice, spots]);
+      const hit = bodyCache.current.get(t);
+      const body = hit && hit.key === key ? hit.body : latticeRegions(t.regions, lattice, spots);
+      cache.set(t, { key, body });
+      result.set(t.char, body);
+    }
+    bodyCache.current = cache;
+    return result;
+  }, [templates, handles, lattice]);
+  const templateBody = (t: LetterTemplate) => bodies.get(t.char) ?? t.regions;
+  /** A letter's printed body, moved and turned with the letter onto its plate. */
+  const plateBody = useCallback(
+    (l: PlacedLetter): Region[] => {
+      const body = bodies.get(l.template.char);
+      return body ? transformRegions(body, (p) => templateToBed(l, p)) : l.regions;
+    },
+    [bodies],
+  );
   const reducedHandles = templates.filter((t) => handles.get(t.char)?.reduced).map((t) => t.char);
   const grams =
     (templates.reduce((s, t) => {
       const h = handles.get(t.char);
-      return s + (t.area * thickness + (h ? handleVolume(h, handle.height) : 0)) * copiesFor(t.char);
+      const area = templateBody(t).reduce((a, r) => a + regionArea(r), 0);
+      return s + (area * thickness + (h ? handleVolume(h, handle.height) : 0)) * copiesFor(t.char);
     }, 0) *
       PLA_DENSITY) /
     1000;
@@ -345,7 +396,7 @@ export default function App() {
   const plateObjects = (plate: PlateLayout) =>
     plate.letters.map((l) => ({
       name: l.copy > 1 ? `${l.template.char} (${l.copy})` : l.template.char,
-      mesh: templateSolid(l.regions, thickness, handle, plateHandle(l)),
+      mesh: templateSolid(l.regions, thickness, handle, plateHandle(l), plateBody(l)),
     }));
 
   const fileBase = () => {
@@ -401,7 +452,7 @@ export default function App() {
       }
       for (const t of templates) {
         files[`letters/${t.slug}.stl`] = meshToStl(
-          templateSolid(t.regions, thickness, handle, templateHandle(t)),
+          templateSolid(t.regions, thickness, handle, templateHandle(t), templateBody(t)),
           t.char,
         );
       }
@@ -606,7 +657,7 @@ export default function App() {
                 id="size"
                 index="03"
                 title="Size & thickness"
-                summary={`${settings.letterHeight} mm · ${thickness} mm${handle.enabled ? " · grip" : ""}`}
+                summary={`${settings.letterHeight} mm · ${thickness} mm${lattice.enabled ? " · lattice" : ""}${handle.enabled ? " · grip" : ""}`}
                 open={section === "size"}
                 onToggle={toggleSection}
               >
@@ -660,6 +711,40 @@ export default function App() {
                       </>
                     }
                   />
+                  <div className="overflow-hidden rounded-xl bg-muted">
+                    <ToggleRow
+                      checked={lattice.enabled}
+                      onChange={(v) => set("lattice", { ...lattice, enabled: v })}
+                      title="Save filament"
+                      description="Prints a solid border to trace round, with an open lattice inside to keep the letter stiff. Uses about half the filament."
+                    />
+                    {lattice.enabled && (
+                      <div className="grid grid-cols-2 gap-3.5 px-3 pt-1 pb-3.5">
+                        <SliderField
+                          compact
+                          id="lattice-border"
+                          label="Border"
+                          value={lattice.border}
+                          min={2}
+                          max={10}
+                          step={0.5}
+                          onChange={(v) => set("lattice", { ...lattice, border: v })}
+                          display={`${lattice.border} mm`}
+                        />
+                        <SliderField
+                          compact
+                          id="lattice-spacing"
+                          label="Lattice gap"
+                          value={lattice.spacing}
+                          min={6}
+                          max={20}
+                          step={1}
+                          onChange={(v) => set("lattice", { ...lattice, spacing: v })}
+                          display={`${lattice.spacing} mm`}
+                        />
+                      </div>
+                    )}
+                  </div>
                   <div className="overflow-hidden rounded-xl bg-muted">
                     <button
                       type="button"
@@ -894,6 +979,7 @@ export default function App() {
                           key={t.char}
                           template={t}
                           handle={handles.get(t.char) ?? null}
+                          body={lattice.enabled ? templateBody(t) : undefined}
                           onHandleMove={(p) => moveHandle(t.char, p)}
                           onHandleReset={settings.handlePositions[t.char] ? () => resetHandle(t.char) : undefined}
                           copies={copiesFor(t.char)}
@@ -902,7 +988,10 @@ export default function App() {
                           onDownload={() =>
                             run(() =>
                               downloadBlob(
-                                meshToStl(templateSolid(t.regions, thickness, handle, templateHandle(t)), t.char),
+                                meshToStl(
+                                  templateSolid(t.regions, thickness, handle, templateHandle(t), templateBody(t)),
+                                  t.char,
+                                ),
                                 `${t.slug}.stl`,
                                 "model/stl",
                               ),
@@ -946,6 +1035,7 @@ export default function App() {
                             thickness={thickness}
                             handle={handle}
                             handleOf={plateHandle}
+                            bodyOf={plateBody}
                             onHandleMove={movePlateHandle}
                             className="h-auto min-h-0 flex-1 rounded-[14px] bg-muted sm:h-auto"
                           />
@@ -968,6 +1058,7 @@ export default function App() {
                           bed={bed}
                           margin={settings.margin}
                           handleOf={handle.enabled ? plateHandle : undefined}
+                          bodyOf={lattice.enabled ? plateBody : undefined}
                           onHandleMove={movePlateHandle}
                           keepOut={keepOut}
                           label

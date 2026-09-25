@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { Vec2 } from "@/lib/geometry";
+import type { Region, Vec2 } from "@/lib/geometry";
 import { handleMesh, type HandlePlacement, type HandleSettings } from "@/lib/handle";
 import { extrudeRegions, type Mesh } from "@/lib/mesh";
 import type { PlacedLetter, PlateLayout } from "@/lib/plates";
@@ -18,6 +18,8 @@ interface Plate3DProps {
   handle: HandleSettings;
   /** Each letter's grip handle in bed coordinates. */
   handleOf: (letter: PlacedLetter) => HandlePlacement | null;
+  /** What each letter prints as, in bed coordinates. */
+  bodyOf: (letter: PlacedLetter) => Region[];
   /** Makes handles draggable; called with the bed point the handle is dragged to. */
   onHandleMove?: (letter: PlacedLetter, point: Vec2) => void;
   className?: string;
@@ -39,7 +41,7 @@ function toGeometry(mesh: Mesh) {
 }
 
 /** Interactive 3D view of a build plate (drag to orbit, scroll to zoom, drag a handle to move it). */
-export function Plate3D({ plate, bed, thickness, handle, handleOf, onHandleMove, className }: Plate3DProps) {
+export function Plate3D({ plate, bed, thickness, handle, handleOf, bodyOf, onHandleMove, className }: Plate3DProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Stage | null>(null);
   const handleMeshes = useRef<THREE.Mesh[]>([]);
@@ -194,7 +196,7 @@ export function Plate3D({ plate, bed, thickness, handle, handleOf, onHandleMove,
     const disposables: { dispose(): void }[] = [];
     const handles: THREE.Mesh[] = [];
     plate.letters.forEach((letter, i) => {
-      const geo = toGeometry(extrudeRegions(letter.regions, thickness));
+      const geo = toGeometry(extrudeRegions(bodyOf(letter), thickness));
       const mat = new THREE.MeshStandardMaterial({
         color: COLOURS[i % COLOURS.length],
         roughness: 0.5,
@@ -224,7 +226,7 @@ export function Plate3D({ plate, bed, thickness, handle, handleOf, onHandleMove,
       stage.scene.remove(group);
       disposables.forEach((d) => d.dispose());
     };
-  }, [plate, thickness, handle.height, handleOf, bed.width, bed.depth]);
+  }, [plate, thickness, handle.height, handleOf, bodyOf, bed.width, bed.depth]);
 
   return (
     <div
