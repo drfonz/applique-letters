@@ -1,22 +1,60 @@
-import { Download, Minus, Plus, TriangleAlert } from "lucide-react";
+import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { Download, Minus, Plus, RotateCcw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { regionsToPathData } from "@/lib/export";
 import type { LetterTemplate } from "@/lib/templates";
+import type { Vec2 } from "@/lib/geometry";
 import type { HandlePlacement } from "@/lib/handle";
 import { cn } from "@/lib/utils";
 
 interface LetterCardProps {
   template: LetterTemplate;
   handle: HandlePlacement | null;
+  /** Makes the handle draggable; called with the template point it is dragged to. */
+  onHandleMove?: (point: Vec2) => void;
+  /** Shown when the handle has been moved by hand, to put it back in the automatic spot. */
+  onHandleReset?: () => void;
   copies: number;
   onCopiesChange: (n: number) => void;
   onDownload: () => void;
   tooBig: boolean;
 }
 
-export function LetterCard({ template, handle, copies, onCopiesChange, onDownload, tooBig }: LetterCardProps) {
+export function LetterCard({
+  template,
+  handle,
+  onHandleMove,
+  onHandleReset,
+  copies,
+  onCopiesChange,
+  onDownload,
+  tooBig,
+}: LetterCardProps) {
   const pad = Math.max(template.width, template.height) * 0.08;
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const toTemplate = (e: PointerEvent): Vec2 | null => {
+    const ctm = svgRef.current?.getScreenCTM();
+    if (!ctm) return null;
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+    return [p.x, template.height - p.y];
+  };
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (!handle || !onHandleMove) return;
+    const step = e.shiftKey ? 5 : 1;
+    const moves: Record<string, Vec2> = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, step],
+      ArrowDown: [0, -step],
+    };
+    const m = moves[e.key];
+    if (!m) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onHandleMove([handle.x + m[0], handle.y + m[1]]);
+  };
   return (
     <div className={cn("flex flex-col rounded-xl border bg-card p-3 shadow-xs", tooBig && "border-destructive/60")}>
       <div className="relative aspect-square rounded-lg bg-muted/60">
@@ -26,6 +64,14 @@ export function LetterCard({ template, handle, copies, onCopiesChange, onDownloa
           className="absolute inset-2 h-[calc(100%-1rem)] w-[calc(100%-1rem)]"
           role="img"
           aria-label={`Template for ${template.char}`}
+          onPointerMove={(e) => {
+            if (!dragging || !onHandleMove) return;
+            const p = toTemplate(e);
+            if (p) onHandleMove(p);
+          }}
+          onPointerUp={() => setDragging(false)}
+          onPointerCancel={() => setDragging(false)}
+          ref={svgRef}
         >
           <path
             d={regionsToPathData(template.regions, template.height)}
@@ -35,16 +81,52 @@ export function LetterCard({ template, handle, copies, onCopiesChange, onDownloa
             strokeWidth={Math.max(template.width, template.height) / 200}
           />
           {handle && (
-            <circle
-              cx={handle.x}
-              cy={template.height - handle.y}
-              r={handle.radius}
-              fill="rgba(255,255,255,.9)"
-              stroke="rgba(0,0,0,.35)"
-              strokeWidth={Math.max(template.width, template.height) / 200}
-            />
+            <g
+              tabIndex={onHandleMove ? 0 : undefined}
+              role={onHandleMove ? "button" : undefined}
+              aria-label={
+                onHandleMove ? `Grip handle on ${template.char}: drag, or use the arrow keys, to move it` : undefined
+              }
+              className={cn(onHandleMove && "cursor-grab touch-none outline-none", dragging && "cursor-grabbing")}
+              onPointerDown={
+                onHandleMove
+                  ? (e) => {
+                      e.preventDefault();
+                      svgRef.current?.setPointerCapture(e.pointerId);
+                      setDragging(true);
+                    }
+                  : undefined
+              }
+              onKeyDown={onKeyDown}
+            >
+              <circle cx={handle.x} cy={template.height - handle.y} r={handle.footRadius} fill="rgba(0,0,0,.18)" />
+              <circle
+                className="[g:focus-visible>&]:stroke-primary"
+                cx={handle.x}
+                cy={template.height - handle.y}
+                r={handle.radius}
+                fill="rgba(255,255,255,.9)"
+                stroke={dragging ? "var(--primary)" : "rgba(0,0,0,.35)"}
+                strokeWidth={(Math.max(template.width, template.height) / 200) * (dragging ? 2.5 : 1)}
+              />
+            </g>
           )}
         </svg>
+        {onHandleReset && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onHandleReset}
+                aria-label={`Put the handle on ${template.char} back in its automatic spot`}
+                className="absolute bottom-1.5 left-1.5 flex size-6 cursor-pointer items-center justify-center rounded-md bg-card/90 text-muted-foreground shadow-xs hover:text-foreground"
+              >
+                <RotateCcw className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Reset handle position</TooltipContent>
+          </Tooltip>
+        )}
         {template.pieces > 1 && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -67,7 +149,12 @@ export function LetterCard({ template, handle, copies, onCopiesChange, onDownloa
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" onClick={onDownload} aria-label={`Download STL for ${template.char}`}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onDownload}
+              aria-label={`Download STL for ${template.char}`}
+            >
               <Download />
             </Button>
           </TooltipTrigger>
@@ -86,7 +173,12 @@ export function LetterCard({ template, handle, copies, onCopiesChange, onDownloa
         <span className="whitespace-nowrap text-xs tabular-nums" aria-live="polite">
           {copies === 0 ? "Skip" : `× ${copies}`}
         </span>
-        <Button variant="ghost" size="icon-sm" onClick={() => onCopiesChange(Math.min(20, copies + 1))} aria-label="More copies">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => onCopiesChange(Math.min(20, copies + 1))}
+          aria-label="More copies"
+        >
           <Plus />
         </Button>
       </div>

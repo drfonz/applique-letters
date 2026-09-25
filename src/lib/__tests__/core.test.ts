@@ -7,6 +7,7 @@ import { extrudeRegions, meshVolume, mergeMeshes } from "../mesh";
 import { meshToStl, meshesTo3mf } from "../export";
 import { nest, placedRegions } from "../nest";
 import { PRINTERS, keepOutAreas } from "../printers";
+import { bedToTemplate, buildPlates, templateToBed } from "../plates";
 import { boundsOf, regionArea } from "../geometry";
 
 function loadFont(file: string) {
@@ -172,6 +173,29 @@ describe("nesting", () => {
     ).toEqual([]);
   });
 
+  it("maps template points onto the plate and back, for every rotation", () => {
+    const { templates } = buildTemplates(fredoka, chars("RLFJ"), { ...base, letterHeight: 70 });
+    const items = templates.flatMap((_, i) => [1, 2].map((copy) => ({ shape: i, copy })));
+    const result = nest(templates, items, { ...bed, timeBudgetMs: 300 });
+    const plates = buildPlates(templates, result, { width: 256, depth: 256 });
+    const turns = new Set<number>();
+    for (const letter of plates.flatMap((p) => p.letters)) {
+      turns.add(letter.turns);
+      // The outline's own vertices must land exactly where the plate outline has them.
+      const src = letter.template.regions[0].outer;
+      const placed = letter.regions[0].outer;
+      const bedPts = src.map((p) => templateToBed(letter, p));
+      for (const q of bedPts) {
+        const nearest = Math.min(...placed.map(([x, y]) => Math.hypot(x - q[0], y - q[1])));
+        expect(nearest).toBeLessThan(1e-6);
+      }
+      const back = bedToTemplate(letter, bedPts[3]);
+      expect(back[0]).toBeCloseTo(src[3][0], 6);
+      expect(back[1]).toBeCloseTo(src[3][1], 6);
+    }
+    expect(turns.size).toBeGreaterThan(1);
+  });
+
   it("reports letters that cannot fit", () => {
     const { templates } = buildTemplates(fredoka, ["W"], { ...base, letterHeight: 300 });
     const result = nest(templates, [{ shape: 0, copy: 1 }], { ...bed, timeBudgetMs: 100 });
@@ -213,7 +237,7 @@ function intersectionArea(a: Region[], b: Region[], grow: number): number {
   return regions.reduce((s, r) => s + Math.abs(regionArea(r)), 0) > 0.5 ? 1 : 0;
 }
 
-import { handleMesh, placeHandle, templateSolid } from "../handle";
+import { canPlaceHandle, handleMesh, placeHandle, templateSolid } from "../handle";
 
 describe("grip handle", () => {
   const settings = { enabled: true, diameter: 12, height: 15 };
@@ -243,6 +267,36 @@ describe("grip handle", () => {
     const small = placeHandle(thin.regions, settings)!;
     expect(small.reduced).toBe(true);
     expect(small.radius).toBeLessThan(6);
+  });
+
+  it("goes where it is moved, but never too close to an edge or into a hole", () => {
+    const r = buildTemplates(fredoka, ["R"], base).templates[0];
+    const auto = placeHandle(r.regions, settings)!;
+    // Down the left of the stem: plenty of room, so the full-size handle goes exactly there.
+    const stem: [number, number] = [auto.x, auto.y];
+    for (let y = 10; y < r.height - 10; y += 2) {
+      const p: [number, number] = [14, y];
+      if (canPlaceHandle(r.regions, settings, p, auto)) {
+        stem[0] = p[0];
+        stem[1] = p[1];
+        break;
+      }
+    }
+    const moved = placeHandle(r.regions, settings, stem)!;
+    expect([moved.x, moved.y]).toEqual(stem);
+    expect(moved.reduced).toBe(false);
+    // The middle of the bowl's counter, and a point off the letter, are both refused.
+    const hole = r.regions[0].holes[0];
+    const hx = hole.reduce((a, p) => a + p[0], 0) / hole.length;
+    const hy = hole.reduce((a, p) => a + p[1], 0) / hole.length;
+    expect(canPlaceHandle(r.regions, settings, [hx, hy], auto)).toBe(false);
+    expect(canPlaceHandle(r.regions, settings, [-5, -5], auto)).toBe(false);
+    // A spot that is no longer on the letter (after a font change, say) falls back to automatic.
+    expect(placeHandle(r.regions, settings, [-5, -5])).toEqual(auto);
+    // An explicit placement is used for the solid.
+    expect(templateSolid(r.regions, 1.2, settings, moved).positions).not.toEqual(
+      templateSolid(r.regions, 1.2, settings).positions,
+    );
   });
 
   it("produces closed solids that stand on the template", () => {

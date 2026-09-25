@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Font } from "opentype.js";
 import { DropdownMenu, Popover } from "radix-ui";
 import { Loader2, TriangleAlert, Type, X } from "lucide-react";
@@ -16,10 +16,18 @@ import { usePacking } from "@/hooks/usePacking";
 import { BUNDLED_FONTS, cssFamily, loadFont, registerPreviewFace, type FontChoice } from "@/lib/fonts";
 import { downloadBlob, meshToStl, meshesTo3mf, regionsToPathData, zipFiles } from "@/lib/export";
 import { mergeMeshes } from "@/lib/mesh";
-import { handleVolume, placeHandle, templateSolid, type HandleSettings } from "@/lib/handle";
+import {
+  canPlaceHandle,
+  handleVolume,
+  placeHandle,
+  templateSolid,
+  type HandlePlacement,
+  type HandleSettings,
+} from "@/lib/handle";
+import type { Vec2 } from "@/lib/geometry";
 import type { NestOptions } from "@/lib/nest";
 import { printPaperTemplates } from "@/lib/paper";
-import { buildPlates, type PlateLayout } from "@/lib/plates";
+import { bedToTemplate, buildPlates, templateToBed, type PlacedLetter, type PlateLayout } from "@/lib/plates";
 import { PRINTERS, keepOutAreas } from "@/lib/printers";
 import { buildTemplates, countCharacters, thicknessOf, type TemplateSettings } from "@/lib/templates";
 import { cn } from "@/lib/utils";
@@ -74,6 +82,8 @@ interface Settings extends TemplateSettings {
   /** Leave room for Bambu Studio's prime tower on Bambu printers. */
   primeTower: boolean;
   handle: HandleSettings;
+  /** Handles moved by hand, per character, as fractions of the letter's width and height. */
+  handlePositions: Record<string, [number, number]>;
 }
 
 const DEFAULTS: Settings = {
@@ -96,6 +106,7 @@ const DEFAULTS: Settings = {
   allowRotation: true,
   primeTower: false,
   handle: { enabled: false, diameter: 12, height: 15 },
+  handlePositions: {},
 };
 
 const STORAGE_KEY = "applique-letters:v1";
@@ -244,7 +255,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (view === "letters" || plates.length < 2 || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [role=slider], [role=listbox], [role=menu], [role=dialog]")) return;
+      if (target?.closest("input, textarea, select, [role=slider], [role=listbox], [role=menu], [role=dialog], [data-handle]")) return;
       if (e.key === "ArrowRight") setSelectedPlate((i) => Math.min(plates.length - 1, i + 1));
       if (e.key === "ArrowLeft") setSelectedPlate((i) => Math.max(0, i - 1));
     };
@@ -257,10 +268,70 @@ export default function App() {
   );
   const totalPieces = items.length;
   const handle = settings.handle;
-  const handles = useMemo(
+  // Automatic spots are costly to find, so they are kept apart from spots moved by hand.
+  const autoHandles = useMemo(
     () => new Map(templates.map((t) => [t.char, placeHandle(t.regions, handle)])),
     [templates, handle],
   );
+  const handles = useMemo(
+    () =>
+      new Map(
+        templates.map((t) => {
+          const f = settings.handlePositions[t.char];
+          const at: Vec2 | null = f ? [f[0] * t.width, f[1] * t.height] : null;
+          return [t.char, at ? placeHandle(t.regions, handle, at) : (autoHandles.get(t.char) ?? null)];
+        }),
+      ),
+    [templates, handle, autoHandles, settings.handlePositions],
+  );
+  const templateHandle = (t: { char: string }) => handles.get(t.char) ?? null;
+  /** A letter's handle, moved and turned with the letter onto its plate. */
+  const plateHandle = useCallback(
+    (l: PlacedLetter): HandlePlacement | null => {
+      const h = handles.get(l.template.char);
+      if (!h) return null;
+      const [x, y] = templateToBed(l, [h.x, h.y]);
+      return { ...h, x, y };
+    },
+    [handles],
+  );
+
+  /**
+   * Move a letter's handle towards `target` (template coordinates). If the spot is too close
+   * to an edge, it goes as far along the way as it can, so dragging slides along the edge
+   * instead of sticking.
+   */
+  const moveHandle = (char: string, target: Vec2) => {
+    const t = templates.find((x) => x.char === char);
+    const current = handles.get(char);
+    if (!t || !current) return;
+    const auto = autoHandles.get(char) ?? null;
+    const ok = (p: Vec2) => canPlaceHandle(t.regions, handle, p, auto);
+    let p: Vec2 | null = null;
+    if (ok(target)) p = target;
+    else {
+      const from: Vec2 = [current.x, current.y];
+      if (!ok(from)) return;
+      let lo = 0;
+      let hi = 1;
+      for (let i = 0; i < 12; i++) {
+        const mid = (lo + hi) / 2;
+        if (ok([from[0] + (target[0] - from[0]) * mid, from[1] + (target[1] - from[1]) * mid])) lo = mid;
+        else hi = mid;
+      }
+      if (lo < 1e-3) return;
+      p = [from[0] + (target[0] - from[0]) * lo, from[1] + (target[1] - from[1]) * lo];
+    }
+    const pos: [number, number] = [p[0] / t.width, p[1] / t.height];
+    setSettings((s) => ({ ...s, handlePositions: { ...s.handlePositions, [char]: pos } }));
+  };
+  const movePlateHandle = (l: PlacedLetter, bedPoint: Vec2) => moveHandle(l.template.char, bedToTemplate(l, bedPoint));
+  const resetHandle = (char: string) =>
+    setSettings((s) => {
+      const { [char]: _, ...rest } = s.handlePositions;
+      return { ...s, handlePositions: rest };
+    });
+  const movedHandles = templates.filter((t) => settings.handlePositions[t.char]).map((t) => t.char);
   const reducedHandles = templates.filter((t) => handles.get(t.char)?.reduced).map((t) => t.char);
   const grams =
     (templates.reduce((s, t) => {
@@ -274,7 +345,7 @@ export default function App() {
   const plateObjects = (plate: PlateLayout) =>
     plate.letters.map((l) => ({
       name: l.copy > 1 ? `${l.template.char} (${l.copy})` : l.template.char,
-      mesh: templateSolid(l.regions, thickness, handle),
+      mesh: templateSolid(l.regions, thickness, handle, plateHandle(l)),
     }));
 
   const fileBase = () => {
@@ -329,7 +400,10 @@ export default function App() {
         );
       }
       for (const t of templates) {
-        files[`letters/${t.slug}.stl`] = meshToStl(templateSolid(t.regions, thickness, handle), t.char);
+        files[`letters/${t.slug}.stl`] = meshToStl(
+          templateSolid(t.regions, thickness, handle, templateHandle(t)),
+          t.char,
+        );
       }
       files["README.txt"] = new TextEncoder().encode(
         [
@@ -820,13 +894,15 @@ export default function App() {
                           key={t.char}
                           template={t}
                           handle={handles.get(t.char) ?? null}
+                          onHandleMove={(p) => moveHandle(t.char, p)}
+                          onHandleReset={settings.handlePositions[t.char] ? () => resetHandle(t.char) : undefined}
                           copies={copiesFor(t.char)}
                           onCopiesChange={(n) => setCopies(t.char, n)}
                           tooBig={tooBig.has(t.char)}
                           onDownload={() =>
                             run(() =>
                               downloadBlob(
-                                meshToStl(templateSolid(t.regions, thickness, handle), t.char),
+                                meshToStl(templateSolid(t.regions, thickness, handle, templateHandle(t)), t.char),
                                 `${t.slug}.stl`,
                                 "model/stl",
                               ),
@@ -869,10 +945,15 @@ export default function App() {
                             bed={bed}
                             thickness={thickness}
                             handle={handle}
+                            handleOf={plateHandle}
+                            onHandleMove={movePlateHandle}
                             className="h-auto min-h-0 flex-1 rounded-[14px] bg-muted sm:h-auto"
                           />
                         </Suspense>
-                        <p className="text-xs text-muted-foreground">Drag to orbit, scroll or pinch to zoom.</p>
+                        <p className="text-xs text-muted-foreground">
+                          Drag to orbit, scroll or pinch to zoom.
+                          {handle.enabled && " Drag a grip handle to move it."}
+                        </p>
                       </div>
                     ) : (
                       <div
@@ -886,7 +967,8 @@ export default function App() {
                           plate={current}
                           bed={bed}
                           margin={settings.margin}
-                          handle={handle}
+                          handleOf={handle.enabled ? plateHandle : undefined}
+                          onHandleMove={movePlateHandle}
                           keepOut={keepOut}
                           label
                           className={cn("h-full transition-opacity", stale && "opacity-70")}
@@ -901,7 +983,23 @@ export default function App() {
                     disabled={stale}
                     on3mf={() => download3mf(current)}
                     onStl={() => downloadStl(current)}
-                  />
+                  >
+                    {handle.enabled && (
+                      <p className="text-xs leading-normal text-pretty text-muted-foreground">
+                        Drag a grip handle to move it; every copy of that letter follows.{" "}
+                        {movedHandles.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => set("handlePositions", {})}
+                            className="cursor-pointer font-medium text-primary hover:underline"
+                          >
+                            Reset{" "}
+                            {movedHandles.length === 1 ? "the moved handle" : `${movedHandles.length} moved handles`}
+                          </button>
+                        )}
+                      </p>
+                    )}
+                  </PlateDetails>
                 </div>
                 <nav
                   aria-label="Plates"
@@ -923,7 +1021,7 @@ export default function App() {
                         plate={p}
                         bed={bed}
                         margin={settings.margin}
-                        handle={handle}
+                        handleOf={handle.enabled ? plateHandle : undefined}
                         keepOut={keepOut}
                         className="rounded-lg"
                       />
@@ -1067,6 +1165,7 @@ function PlateDetails({
   disabled,
   on3mf,
   onStl,
+  children,
 }: {
   plate: PlateLayout;
   count: number;
@@ -1074,6 +1173,7 @@ function PlateDetails({
   disabled: boolean;
   on3mf: () => void;
   onStl: () => void;
+  children?: ReactNode;
 }) {
   const chars = plate.letters.map((l) => l.template.char).join("");
   const fill = `${Math.round(plate.utilisation * 100)}%`;
@@ -1124,6 +1224,7 @@ function PlateDetails({
         Bambu Studio 2.8.2 may warn that the file has an “invalid config”. That’s expected: click OK and the letters
         load with your own printer and filament settings.
       </p>
+      {children}
     </div>
   );
 }

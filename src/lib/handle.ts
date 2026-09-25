@@ -77,14 +77,44 @@ function centroid(region: Region): Vec2 {
   return total ? [cx / (3 * total), cy / (3 * total)] : region.outer[0];
 }
 
+/** Post and foot sizes for a handle at `p`, given how much material surrounds it. */
+function sized(p: Vec2, d: number, settings: HandleSettings): HandlePlacement {
+  const room = d - EDGE_CLEARANCE;
+  const radius = Math.max(MIN_RADIUS, Math.min(settings.diameter / 2, room - FLARE));
+  const footRadius = Math.max(radius, Math.min(radius + FLARE, room));
+  return { x: p[0], y: p[1], radius, footRadius, reduced: radius < settings.diameter / 2 - 0.05 };
+}
+
+/**
+ * Whether the handle may be moved to `p`: it must sit on material with at least as much room
+ * as the full-size handle needs, or, on letters too narrow for that anywhere, as much room as
+ * the automatic spot has.
+ */
+export function canPlaceHandle(
+  regions: Region[],
+  settings: HandleSettings,
+  p: Vec2,
+  auto: HandlePlacement | null,
+): boolean {
+  const region = regions.find((r) => pointInRegion(p, r));
+  if (!region) return false;
+  const wanted = settings.diameter / 2 + FLARE + EDGE_CLEARANCE;
+  const need = auto ? Math.min(wanted, auto.footRadius + EDGE_CLEARANCE) : wanted;
+  return edgeDistance(p, region) >= need - 1e-6;
+}
+
 /**
  * Where to put the handle: on the largest piece of the letter, as close to its centre of
  * mass as possible (so a single press holds the whole letter flat) while still sitting on
  * material wide enough for the post. If nowhere is wide enough, the widest spot is used and
- * the post is made thinner.
+ * the post is made thinner. Passing `at` puts it exactly there instead, if that is on the letter.
  */
-export function placeHandle(regions: Region[], settings: HandleSettings): HandlePlacement | null {
+export function placeHandle(regions: Region[], settings: HandleSettings, at?: Vec2 | null): HandlePlacement | null {
   if (!settings.enabled || regions.length === 0) return null;
+  if (at) {
+    const chosen = regions.find((r) => pointInRegion(at, r));
+    if (chosen) return sized(at, edgeDistance(at, chosen), settings);
+  }
   const region = regions.reduce((a, b) => (regionArea(b) > regionArea(a) ? b : a));
   const target = centroid(region);
   const wanted = settings.diameter / 2 + FLARE + EDGE_CLEARANCE;
@@ -123,15 +153,13 @@ export function placeHandle(regions: Region[], settings: HandleSettings): Handle
   if (!best) return null;
   for (let round = 0; round < 4; round++) {
     const c: Vec2 = (best as Candidate).p;
-    for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) consider([c[0] + (i * step) / 3, c[1] + (j * step) / 3]);
+    for (let i = -3; i <= 3; i++)
+      for (let j = -3; j <= 3; j++) consider([c[0] + (i * step) / 3, c[1] + (j * step) / 3]);
     step /= 3;
   }
 
   const { p, d } = best as Candidate;
-  const room = d - EDGE_CLEARANCE;
-  const radius = Math.max(MIN_RADIUS, Math.min(settings.diameter / 2, room - FLARE));
-  const footRadius = Math.max(radius, Math.min(radius + FLARE, room));
-  return { x: p[0], y: p[1], radius, footRadius, reduced: radius < settings.diameter / 2 - 0.05 };
+  return sized(p, d, settings);
 }
 
 /**
@@ -197,9 +225,17 @@ export function handleVolume(h: HandlePlacement, height: number): number {
   return cone + Math.PI * h.radius ** 2 * Math.max(0, height - flare);
 }
 
-/** A template as a printable solid: the flat letter plus, optionally, its handle. */
-export function templateSolid(regions: Region[], thickness: number, handle: HandleSettings): Mesh {
+/**
+ * A template as a printable solid: the flat letter plus, optionally, its handle. The handle
+ * goes where `placement` says, or is placed automatically when it is left out.
+ */
+export function templateSolid(
+  regions: Region[],
+  thickness: number,
+  handle: HandleSettings,
+  placement?: HandlePlacement | null,
+): Mesh {
   const slab = extrudeRegions(regions, thickness);
-  const h = placeHandle(regions, handle);
+  const h = handle.enabled ? (placement === undefined ? placeHandle(regions, handle) : placement) : null;
   return h ? mergeMeshes([slab, handleMesh(h, thickness, handle.height)]) : slab;
 }
