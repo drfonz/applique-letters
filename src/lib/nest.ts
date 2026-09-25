@@ -24,6 +24,15 @@ export interface NestShape {
   regions: Region[];
 }
 
+/** A rectangle of the bed (mm, origin front-left) that letters must stay out of. */
+export interface KeepOut {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  kind?: "prime-tower" | "excluded";
+}
+
 export interface NestOptions {
   bedWidth: number;
   bedDepth: number;
@@ -32,6 +41,8 @@ export interface NestOptions {
   /** Minimum gap between two letters (mm). */
   spacing: number;
   allowRotation: boolean;
+  /** Areas to leave empty on every plate, such as a slicer's prime tower. */
+  keepOut?: KeepOut[];
   /** Time budget for the search, in milliseconds. */
   timeBudgetMs: number;
   /** Grid resolution (mm). Chosen automatically when omitted. */
@@ -150,9 +161,11 @@ class Plate {
   constructor(
     readonly cols: number,
     readonly rows: number,
+    blocked?: Raster,
   ) {
     this.prefix = Array.from({ length: rows }, () => new Int32Array(cols + 1));
     this.maxFree = new Int32Array(rows).fill(cols);
+    if (blocked) this.place(blocked, 0, 0);
   }
 
   /**
@@ -239,6 +252,39 @@ class Plate {
   }
 }
 
+/** Grid cells touched by any keep-out rectangle, as a plate-sized raster. */
+function blockedRaster(
+  areas: KeepOut[],
+  originX: number,
+  originY: number,
+  cell: number,
+  cols: number,
+  rows: number,
+): Raster {
+  const spans: [number, number][][] = Array.from({ length: rows }, () => []);
+  for (const k of areas) {
+    const i0 = Math.max(0, Math.floor((k.x - originX) / cell));
+    const i1 = Math.min(cols, Math.ceil((k.x + k.width - originX) / cell));
+    const j0 = Math.max(0, Math.floor((k.y - originY) / cell));
+    const j1 = Math.min(rows, Math.ceil((k.y + k.depth - originY) / cell));
+    if (i1 <= i0) continue;
+    for (let j = j0; j < j1; j++) spans[j].push([i0, i1]);
+  }
+  let cells = 0;
+  const runs = spans.map((row) => {
+    row.sort((a, b) => a[0] - b[0]);
+    const merged: number[] = [];
+    for (const [a, b] of row) {
+      if (merged.length && merged[merged.length - 1] >= a)
+        merged[merged.length - 1] = Math.max(merged[merged.length - 1], b);
+      else merged.push(a, b);
+    }
+    for (let k = 0; k < merged.length; k += 2) cells += merged[k + 1] - merged[k];
+    return Int32Array.from(merged);
+  });
+  return { cols, rows, runs, cells, order: new Int32Array(0), longest: new Int32Array(rows), pad: 0 };
+}
+
 /** Small deterministic PRNG so results are reproducible. */
 function mulberry32(seed: number) {
   let a = seed >>> 0;
@@ -275,10 +321,12 @@ export function nest(
 ): NestResult {
   const started = performance.now();
   const typical = shapes.length
-    ? shapes.map((sh) => {
-        const b = boundsOf(sh.regions);
-        return Math.min(b.maxX - b.minX, b.maxY - b.minY);
-      }).sort((a, b) => a - b)[Math.floor(shapes.length / 2)]
+    ? shapes
+        .map((sh) => {
+          const b = boundsOf(sh.regions);
+          return Math.min(b.maxX - b.minX, b.maxY - b.minY);
+        })
+        .sort((a, b) => a - b)[Math.floor(shapes.length / 2)]
     : 0;
   const cell = options.cellSize ?? autoCellSize(options, typical);
   const halfGap = options.spacing / 2;
@@ -291,7 +339,15 @@ export function nest(
   const originY = Math.max(0, options.margin - halfGap);
   const cols = Math.floor((options.bedWidth - 2 * originX) / cell);
   const rows = Math.floor((options.bedDepth - 2 * originY) / cell);
-  const usableArea = (options.bedWidth - 2 * options.margin) * (options.bedDepth - 2 * options.margin);
+  const keepOut = options.keepOut ?? [];
+  const blocked = keepOut.length ? blockedRaster(keepOut, originX, originY, cell, cols, rows) : undefined;
+  const usableArea =
+    (options.bedWidth - 2 * options.margin) * (options.bedDepth - 2 * options.margin) -
+    keepOut.reduce((sum, k) => {
+      const w = Math.min(k.x + k.width, options.bedWidth - options.margin) - Math.max(k.x, options.margin);
+      const d = Math.min(k.y + k.depth, options.bedDepth - options.margin) - Math.max(k.y, options.margin);
+      return sum + Math.max(0, w) * Math.max(0, d);
+    }, 0);
 
   const shapeArea = shapes.map((s) => s.regions.reduce((a, r) => a + regionArea(r), 0));
   const orientations: Orientation[][] = shapes.map((s) => {
@@ -311,7 +367,10 @@ export function nest(
 
   // Each letter needs at least its outline grown by half the gap.
   const grownArea = shapes.map((s) =>
-    cleanAndOffset(s.regions.flatMap((r) => [r.outer, ...r.holes]), halfGap).reduce((a, r) => a + regionArea(r), 0),
+    cleanAndOffset(
+      s.regions.flatMap((r) => [r.outer, ...r.holes]),
+      halfGap,
+    ).reduce((a, r) => a + regionArea(r), 0),
   );
   const totalArea = items.reduce((s, it) => s + grownArea[it.shape], 0);
   const lowerBound = Math.max(items.length ? 1 : 0, Math.ceil(totalArea / usableArea - 1e-9));
@@ -362,7 +421,7 @@ export function nest(
       };
       for (let p = 0; p < plates.length && !done; p++) done = tryPlate(p);
       if (!done) {
-        plates.push(new Plate(cols, rows));
+        plates.push(new Plate(cols, rows, blocked));
         done = tryPlate(plates.length - 1);
         if (!done) {
           plates.pop();

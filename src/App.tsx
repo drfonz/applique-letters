@@ -20,7 +20,7 @@ import { handleVolume, placeHandle, templateSolid, type HandleSettings } from "@
 import type { NestOptions } from "@/lib/nest";
 import { printPaperTemplates } from "@/lib/paper";
 import { buildPlates, type PlateLayout } from "@/lib/plates";
-import { PRINTERS } from "@/lib/printers";
+import { PRINTERS, keepOutAreas } from "@/lib/printers";
 import { buildTemplates, countCharacters, thicknessOf, type TemplateSettings } from "@/lib/templates";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +71,8 @@ interface Settings extends TemplateSettings {
   margin: number;
   spacing: number;
   allowRotation: boolean;
+  /** Leave room for Bambu Studio's prime tower on Bambu printers. */
+  primeTower: boolean;
   handle: HandleSettings;
 }
 
@@ -92,6 +94,7 @@ const DEFAULTS: Settings = {
   margin: 5,
   spacing: 3,
   allowRotation: true,
+  primeTower: false,
   handle: { enabled: false, diameter: 12, height: 15 },
 };
 
@@ -207,6 +210,11 @@ export default function App() {
   );
 
   const bed = { width: settings.bedWidth, depth: settings.bedDepth };
+  const printer = PRINTERS.find((p) => p.id === settings.printer) ?? PRINTERS[0];
+  const keepOut = useMemo(
+    () => keepOutAreas(printer, { width: settings.bedWidth, depth: settings.bedDepth }, settings.primeTower),
+    [printer, settings.bedWidth, settings.bedDepth, settings.primeTower],
+  );
   const nestOptions: NestOptions = useMemo(
     () => ({
       bedWidth: settings.bedWidth,
@@ -214,17 +222,18 @@ export default function App() {
       margin: settings.margin,
       spacing: settings.spacing,
       allowRotation: settings.allowRotation,
+      keepOut,
       timeBudgetMs: 4000,
     }),
-    [settings.bedWidth, settings.bedDepth, settings.margin, settings.spacing, settings.allowRotation],
+    [settings.bedWidth, settings.bedDepth, settings.margin, settings.spacing, settings.allowRotation, keepOut],
   );
   const packing = usePacking(templates, items, nestOptions);
   const thickness = thicknessOf(settings);
 
   const plates: PlateLayout[] = useMemo(() => {
     if (!packing.result) return [];
-    return buildPlates(packing.templates, packing.result, bed);
-  }, [packing.result, packing.templates, bed.width, bed.depth]);
+    return buildPlates(packing.templates, packing.result, bed, keepOut.length === 0);
+  }, [packing.result, packing.templates, bed.width, bed.depth, keepOut]);
 
   useEffect(() => {
     if (selectedPlate >= plates.length) setSelectedPlate(0);
@@ -352,7 +361,6 @@ export default function App() {
     );
 
   const setCopies = (char: string, n: number) => set("overrides", { ...settings.overrides, [char]: n });
-  const printer = PRINTERS.find((p) => p.id === settings.printer) ?? PRINTERS[0];
   const current = plates[selectedPlate];
   const result = packing.result && items.length > 0 ? packing.result : null;
   const optimal = !!result && !packing.running && result.plateCount <= result.lowerBound;
@@ -748,6 +756,15 @@ export default function App() {
                     title="Rotate letters to save plates"
                     description="Lets letters turn sideways or upside down so they nest together more tightly."
                   />
+                  {printer.primeTower && (
+                    <ToggleRow
+                      checked={settings.primeTower}
+                      onChange={(v) => set("primeTower", v)}
+                      className="rounded-[10px] bg-muted"
+                      title="Leave room for the prime tower"
+                      description="Turn on if Bambu Studio adds a prime tower (with the AMS, smooth timelapses or nozzle-wrapping detection). Keeps its spot at the back of the plate clear, at the cost of a little space."
+                    />
+                  )}
                 </div>
               </Section>
             </div>
@@ -870,6 +887,7 @@ export default function App() {
                           bed={bed}
                           margin={settings.margin}
                           handle={handle}
+                          keepOut={keepOut}
                           label
                           className={cn("h-full transition-opacity", stale && "opacity-70")}
                         />
@@ -906,6 +924,7 @@ export default function App() {
                         bed={bed}
                         margin={settings.margin}
                         handle={handle}
+                        keepOut={keepOut}
                         className="rounded-lg"
                       />
                       <span className="font-mono text-[11px] text-muted-foreground">

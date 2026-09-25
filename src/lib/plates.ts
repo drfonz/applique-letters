@@ -16,11 +16,15 @@ export interface PlateLayout {
   utilisation: number;
 }
 
-/** Turn nesting output into per-plate outlines, centred on the bed as slicers expect. */
+/**
+ * Turn nesting output into per-plate outlines. Plates are centred on the bed as slicers expect,
+ * unless areas were kept clear, since moving the letters could push them into those areas.
+ */
 export function buildPlates(
   templates: LetterTemplate[],
   result: NestResult,
   bed: { width: number; depth: number },
+  centre = true,
 ): PlateLayout[] {
   const plates: PlateLayout[] = Array.from({ length: result.plateCount }, (_, index) => ({
     index,
@@ -39,14 +43,16 @@ export function buildPlates(
       rotation: p.rotation * 90,
       regions: placedRegions(templates[p.shape].regions, p),
     }));
-    const b = boundsOf(letters.flatMap((l) => l.regions));
-    const dx = (bed.width - (b.maxX - b.minX)) / 2 - b.minX;
-    const dy = (bed.depth - (b.maxY - b.minY)) / 2 - b.minY;
-    for (const l of letters) {
-      l.regions = l.regions.map((r) => ({
-        outer: r.outer.map(([x, y]) => [x + dx, y + dy]),
-        holes: r.holes.map((h) => h.map(([x, y]) => [x + dx, y + dy])),
-      }));
+    if (centre) {
+      const b = boundsOf(letters.flatMap((l) => l.regions));
+      const dx = (bed.width - (b.maxX - b.minX)) / 2 - b.minX;
+      const dy = (bed.depth - (b.maxY - b.minY)) / 2 - b.minY;
+      for (const l of letters) {
+        l.regions = l.regions.map((r) => ({
+          outer: r.outer.map(([x, y]) => [x + dx, y + dy]),
+          holes: r.holes.map((h) => h.map(([x, y]) => [x + dx, y + dy])),
+        }));
+      }
     }
     // Reading order: back row first, left to right.
     letters.sort((a, b) => {

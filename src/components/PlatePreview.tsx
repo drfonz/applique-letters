@@ -3,6 +3,7 @@ import { boundsOf } from "@/lib/geometry";
 import { regionsToPathData } from "@/lib/export";
 import type { PlateLayout } from "@/lib/plates";
 import { placeHandle, type HandleSettings } from "@/lib/handle";
+import type { KeepOut } from "@/lib/nest";
 import { cn } from "@/lib/utils";
 
 const COLOURS = ["var(--letter-1)", "var(--letter-2)", "var(--letter-3)", "var(--letter-4)", "var(--letter-5)"];
@@ -12,14 +13,17 @@ interface PlatePreviewProps {
   bed: { width: number; depth: number };
   margin: number;
   handle?: HandleSettings;
+  /** Areas the nesting left clear, drawn hatched. */
+  keepOut?: KeepOut[];
   /** Show the plate name, letter count and fill in the corner. */
   label?: boolean;
   className?: string;
 }
 
 /** Top-down view of one build plate, drawn to scale. */
-export function PlatePreview({ plate, bed, margin, handle, label, className }: PlatePreviewProps) {
+export function PlatePreview({ plate, bed, margin, handle, keepOut = [], label, className }: PlatePreviewProps) {
   const patternId = useId();
+  const hatchId = useId();
   const shapes = useMemo(
     () =>
       plate.letters.map((l, i) => {
@@ -47,6 +51,15 @@ export function PlatePreview({ plate, bed, margin, handle, label, className }: P
         aria-label={`Plate ${plate.index + 1}: ${plate.letters.map((l) => l.template.char).join(" ")}`}
       >
         <defs>
+          <pattern
+            id={hatchId}
+            width={stroke * 6}
+            height={stroke * 6}
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate(45)"
+          >
+            <line x1="0" y1="0" x2="0" y2={stroke * 6} stroke="var(--plate-edge)" strokeWidth={stroke * 1.5} />
+          </pattern>
           <pattern id={patternId} width={grid} height={grid} patternUnits="userSpaceOnUse">
             <path d={`M ${grid} 0 L 0 0 0 ${grid}`} fill="none" stroke="var(--plate-grid)" strokeWidth={stroke * 1.2} />
           </pattern>
@@ -63,6 +76,23 @@ export function PlatePreview({ plate, bed, margin, handle, label, className }: P
           strokeWidth={stroke * 1.2}
           strokeDasharray={`${stroke * 5} ${stroke * 5}`}
         />
+        {keepOut.map((k) => (
+          <rect
+            key={`${k.x}-${k.y}`}
+            x={k.x}
+            y={bed.depth - k.y - k.depth}
+            width={k.width}
+            height={k.depth}
+            rx={stroke * 3}
+            fill={`url(#${hatchId})`}
+            stroke="var(--plate-edge)"
+            strokeWidth={stroke}
+          >
+            <title>
+              {k.kind === "prime-tower" ? "Kept clear for the prime tower" : "The printer doesn’t print here"}
+            </title>
+          </rect>
+        ))}
         {shapes.map((s) => (
           <g key={s.key}>
             <path d={s.d} fill={s.colour} fillRule="evenodd" stroke="rgba(0,0,0,.35)" strokeWidth={stroke} />
@@ -83,7 +113,7 @@ export function PlatePreview({ plate, bed, margin, handle, label, className }: P
         ))}
       </svg>
       {label && (
-        <div className="absolute bottom-[3.5%] left-[3.5%] rounded-[7px] bg-black/50 px-2.5 py-1 font-mono text-xs font-medium text-white backdrop-blur-sm">
+        <div className="absolute right-[3.5%] bottom-[3.5%] rounded-[7px] bg-black/50 px-2.5 py-1 font-mono text-xs font-medium text-white backdrop-blur-sm">
           Plate {plate.index + 1} · {count} letter{count === 1 ? "" : "s"} · {Math.round(plate.utilisation * 100)}% full
         </div>
       )}

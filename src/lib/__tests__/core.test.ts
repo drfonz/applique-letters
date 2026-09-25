@@ -6,6 +6,7 @@ import { buildTemplates, countCharacters, thicknessOf, type TemplateSettings } f
 import { extrudeRegions, meshVolume, mergeMeshes } from "../mesh";
 import { meshToStl, meshesTo3mf } from "../export";
 import { nest, placedRegions } from "../nest";
+import { PRINTERS, keepOutAreas } from "../printers";
 import { boundsOf, regionArea } from "../geometry";
 
 function loadFont(file: string) {
@@ -132,6 +133,45 @@ describe("nesting", () => {
     );
   });
 
+  it("keeps letters out of the printer's excluded corner and the prime tower spot", () => {
+    const x1 = PRINTERS.find((p) => p.id === "bambu-x1")!;
+    const keepOut = keepOutAreas(x1, { width: 256, depth: 256 }, true);
+    expect(keepOut.map((k) => k.kind)).toEqual(["excluded", "prime-tower"]);
+    const tower = keepOut[1];
+    // Bambu Studio puts the tower's left edge at x = 165, 15 mm in from the back edge.
+    expect(tower.x).toBeLessThan(165);
+    expect(tower.x + tower.width).toBeGreaterThan(165 + 35);
+    expect(tower.y + tower.depth).toBe(256);
+
+    const { templates } = buildTemplates(fredoka, ALPHABET, { ...base, letterHeight: 80 });
+    const items = templates.map((_, i) => ({ shape: i, copy: 1 }));
+    const result = nest(templates, items, { ...bed, keepOut, timeBudgetMs: 1500 });
+    expect(result.unplaced).toEqual([]);
+    const zones: Region[][] = keepOut.map((k) => [
+      {
+        outer: [
+          [k.x, k.y],
+          [k.x + k.width, k.y],
+          [k.x + k.width, k.y + k.depth],
+          [k.x, k.y + k.depth],
+        ],
+        holes: [],
+      },
+    ]);
+    for (const pl of result.placements) {
+      const outline = placedRegions(templates[pl.shape].regions, pl);
+      for (const zone of zones) expect(intersectionArea(outline, zone, 0)).toBe(0);
+    }
+    expect(keepOutAreas(x1, { width: 256, depth: 256 }, false).map((k) => k.kind)).toEqual(["excluded"]);
+    expect(
+      keepOutAreas(
+        PRINTERS.find((p) => p.id === "prusa-mk4")!,
+        { width: 250, depth: 210 },
+        true,
+      ),
+    ).toEqual([]);
+  });
+
   it("reports letters that cannot fit", () => {
     const { templates } = buildTemplates(fredoka, ["W"], { ...base, letterHeight: 300 });
     const result = nest(templates, [{ shape: 0, copy: 1 }], { ...bed, timeBudgetMs: 100 });
@@ -144,16 +184,32 @@ import ClipperLib from "clipper-lib";
 import { cleanAndOffset, type Region } from "../geometry";
 
 function intersectionArea(a: Region[], b: Region[], grow: number): number {
-  const ga = cleanAndOffset(a.flatMap((r) => [r.outer, ...r.holes]), grow);
-  const gb = cleanAndOffset(b.flatMap((r) => [r.outer, ...r.holes]), grow);
+  const ga = cleanAndOffset(
+    a.flatMap((r) => [r.outer, ...r.holes]),
+    grow,
+  );
+  const gb = cleanAndOffset(
+    b.flatMap((r) => [r.outer, ...r.holes]),
+    grow,
+  );
   const toPaths = (rs: Region[]) =>
-    rs.flatMap((r) => [r.outer, ...r.holes]).map((ring) => ring.map(([x, y]) => ({ X: Math.round(x * 1000), Y: Math.round(y * 1000) })));
+    rs
+      .flatMap((r) => [r.outer, ...r.holes])
+      .map((ring) => ring.map(([x, y]) => ({ X: Math.round(x * 1000), Y: Math.round(y * 1000) })));
   const c = new ClipperLib.Clipper();
   c.AddPaths(toPaths(ga), ClipperLib.PolyType.ptSubject, true);
   c.AddPaths(toPaths(gb), ClipperLib.PolyType.ptClip, true);
   const out: ClipperLib.IntPoint[][] = [];
-  c.Execute(ClipperLib.ClipType.ctIntersection, out, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
-  const regions: Region[] = out.map((p) => ({ outer: p.map((q) => [q.X / 1000, q.Y / 1000] as [number, number]), holes: [] }));
+  c.Execute(
+    ClipperLib.ClipType.ctIntersection,
+    out,
+    ClipperLib.PolyFillType.pftNonZero,
+    ClipperLib.PolyFillType.pftNonZero,
+  );
+  const regions: Region[] = out.map((p) => ({
+    outer: p.map((q) => [q.X / 1000, q.Y / 1000] as [number, number]),
+    holes: [],
+  }));
   return regions.reduce((s, r) => s + Math.abs(regionArea(r)), 0) > 0.5 ? 1 : 0;
 }
 
@@ -201,7 +257,9 @@ describe("grip handle", () => {
 
     const solid = templateSolid(t.regions, 1.2, settings);
     expect(isWatertight(solid.indices)).toBe(true);
-    expect(templateSolid(t.regions, 1.2, { ...settings, enabled: false }).indices.length).toBeLessThan(solid.indices.length);
+    expect(templateSolid(t.regions, 1.2, { ...settings, enabled: false }).indices.length).toBeLessThan(
+      solid.indices.length,
+    );
   });
 });
 
