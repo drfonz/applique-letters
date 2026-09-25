@@ -3,7 +3,7 @@ import { Check, Globe, Loader2, Search, Sparkles, Type, Upload } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -21,7 +21,15 @@ import { cn } from "@/lib/utils";
 
 const SAMPLE = "ABC abc 123";
 
-function FontSample({ choice, text = SAMPLE, className }: { choice: FontChoice; text?: string; className?: string }) {
+export function FontSample({
+  choice,
+  text = SAMPLE,
+  className,
+}: {
+  choice: FontChoice;
+  text?: string;
+  className?: string;
+}) {
   useEffect(() => registerPreviewFace(choice), [choice]);
   return (
     <span className={cn("block truncate", className)} style={{ fontFamily: `"${cssFamily(choice)}", system-ui` }}>
@@ -65,8 +73,8 @@ function GoogleFontsTab({ onPick }: { onPick: (c: FontChoice) => void }) {
   if (error) {
     return (
       <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-        Couldn't reach the Google Fonts catalogue ({error}). Check your connection, or pick one of the recommended fonts,
-        or upload a font file.
+        Couldn't reach the Google Fonts catalogue ({error}). Check your connection, or pick one of the recommended
+        fonts, or upload a font file.
       </div>
     );
   }
@@ -123,7 +131,8 @@ function GoogleFontsTab({ onPick }: { onPick: (c: FontChoice) => void }) {
                 >
                   <span className="font-medium">{f.family}</span>
                   <span className="text-xs text-muted-foreground">
-                    {CATEGORY_NAMES[f.category] ?? f.category} · {f.weights.length} weight{f.weights.length > 1 ? "s" : ""}
+                    {CATEGORY_NAMES[f.category] ?? f.category} · {f.weights.length} weight
+                    {f.weights.length > 1 ? "s" : ""}
                   </span>
                 </button>
               </li>
@@ -169,37 +178,71 @@ function GoogleFontsTab({ onPick }: { onPick: (c: FontChoice) => void }) {
   );
 }
 
-export function FontPicker({ value, onChange }: { value: FontChoice; onChange: (c: FontChoice) => void }) {
+/** How many recommended fonts to show as quick picks in the sidebar. */
+const QUICK_PICKS = 6;
+
+/** A grid of quick-pick font tiles, with a link to the full font browser. */
+export function FontTiles({ value, onChange }: { value: FontChoice; onChange: (c: FontChoice) => void }) {
   const [open, setOpen] = useState(false);
+  const quick = BUNDLED_FONTS.slice(0, QUICK_PICKS);
+  const tiles = quick.some((f) => f.key === value.key) ? quick : [value, ...quick.slice(0, QUICK_PICKS - 1)];
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {tiles.map((f) => {
+        const on = f.key === value.key;
+        return (
+          <button
+            key={f.key}
+            type="button"
+            title={f.note}
+            aria-pressed={on}
+            onClick={() => onChange(f)}
+            className={cn(
+              "min-w-0 cursor-pointer rounded-[10px] p-3 text-left transition-colors",
+              on ? "border-2 border-primary p-[11px]" : "border hover:border-primary/50 hover:bg-accent/50",
+            )}
+          >
+            <FontSample choice={f} text="Aa" className="text-[28px] leading-[1.2]" />
+            <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+              {f.family}
+              {f.source === "google" && <Globe className="size-3 shrink-0" />}
+              {f.source === "upload" && <Upload className="size-3 shrink-0" />}
+            </span>
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="col-span-full cursor-pointer pt-1 text-left text-[13px] text-primary hover:underline"
+      >
+        Browse 1,800+ Google Fonts or upload your own…
+      </button>
+      <FontDialog open={open} onOpenChange={setOpen} value={value} onChange={onChange} />
+    </div>
+  );
+}
+
+interface FontDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  value: FontChoice;
+  onChange: (c: FontChoice) => void;
+}
+
+export function FontDialog({ open, onOpenChange, value, onChange }: FontDialogProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const pick = (c: FontChoice) => {
     onChange(c);
-    setOpen(false);
+    onOpenChange(false);
   };
 
   const categories = [...new Set(BUNDLED_FONTS.map((f) => f.category))];
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className="group flex w-full items-center gap-3 rounded-lg border bg-background p-3 text-left shadow-xs transition hover:border-primary/50 hover:bg-accent/40 cursor-pointer"
-        >
-          <div className="min-w-0 flex-1">
-            <FontSample choice={value} text="Aa Bb Cc" className="text-2xl leading-tight" />
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-              {value.family}
-              {value.source !== "bundled" && <span>· weight {value.weight}</span>}
-              {value.source === "google" && <Globe className="size-3" />}
-              {value.source === "upload" && <Upload className="size-3" />}
-            </p>
-          </div>
-          <span className="text-sm font-medium text-primary group-hover:underline">Change</span>
-        </button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Choose a font</DialogTitle>

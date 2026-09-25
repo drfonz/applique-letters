@@ -1,9 +1,4 @@
-import { Heart, Star, Circle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { ToggleRow } from "@/components/ToggleRow";
 import { cn } from "@/lib/utils";
 
 export type LetterMode = "text" | "pick";
@@ -36,11 +31,31 @@ interface LetterPickerProps {
   picked: string[];
   onPickedChange: (chars: string[]) => void;
   missing: string[];
+  /** CSS font family used to show the banner text in the chosen typeface. */
+  fontFamily?: string;
 }
 
+const SHAPES = [
+  { c: "♥", label: "Heart" },
+  { c: "★", label: "Star" },
+  { c: "●", label: "Circle" },
+];
+
+const linkClass = "cursor-pointer font-medium text-primary hover:underline";
+
 export function LetterPicker(props: LetterPickerProps) {
-  const { mode, onModeChange, text, onTextChange, perOccurrence, onPerOccurrenceChange, picked, onPickedChange, missing } =
-    props;
+  const {
+    mode,
+    onModeChange,
+    text,
+    onTextChange,
+    perOccurrence,
+    onPerOccurrenceChange,
+    picked,
+    onPickedChange,
+    missing,
+    fontFamily,
+  } = props;
   const pickedSet = new Set(picked);
   const toggle = (c: string) => {
     const next = new Set(pickedSet);
@@ -57,102 +72,116 @@ export function LetterPicker(props: LetterPickerProps) {
     onPickedChange(sortChars(next));
   };
 
-  return (
-    <Tabs value={mode} onValueChange={(v) => onModeChange(v as LetterMode)}>
-      <TabsList className="w-full">
-        <TabsTrigger value="text">From banner words</TabsTrigger>
-        <TabsTrigger value="pick">Pick letters</TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="text" className="space-y-3">
-        <Textarea
+  if (mode === "text") {
+    return (
+      <div className="flex flex-col gap-3.5">
+        <textarea
           value={text}
           onChange={(e) => onTextChange(e.target.value)}
           placeholder="HAPPY BIRTHDAY"
-          className="min-h-20 text-lg font-semibold tracking-wide"
+          rows={2}
           aria-label="Banner text"
+          className="resize-none rounded-[10px] border bg-background px-3.5 py-3 text-[26px] leading-[1.15] tracking-[.02em] outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+          style={{ fontFamily: fontFamily ? `"${fontFamily}", var(--font-display)` : "var(--font-display)" }}
         />
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs text-muted-foreground">Add a shape:</span>
-          {[
-            { c: "♥", icon: Heart, label: "Heart" },
-            { c: "★", icon: Star, label: "Star" },
-            { c: "●", icon: Circle, label: "Circle" },
-          ].map(({ c, icon: Icon, label }) => (
-            <Button key={c} variant="outline" size="sm" onClick={() => onTextChange(text + c)} aria-label={`Add ${label}`}>
-              <Icon /> {label}
-            </Button>
+          <span className="mr-1 text-xs text-muted-foreground">Add</span>
+          {SHAPES.map(({ c, label }) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => onTextChange(text + c)}
+              aria-label={`Add a ${label.toLowerCase()}`}
+              className="h-[30px] shrink-0 cursor-pointer whitespace-nowrap rounded-lg border px-2.5 text-[13px] transition-colors hover:border-primary/50 hover:bg-accent"
+            >
+              {c} {label}
+            </button>
           ))}
         </div>
-        <div className="flex items-start justify-between gap-3 rounded-lg bg-muted/50 p-3">
-          <div className="space-y-1">
-            <Label htmlFor="per-occurrence">A template for every letter</Label>
-            <p className="text-xs text-muted-foreground">
-              {perOccurrence
-                ? "Repeated letters (the two P's in HAPPY) each get their own template."
-                : "One template per distinct letter: trace it as many times as you need."}
-            </p>
-          </div>
-          <Switch id="per-occurrence" checked={perOccurrence} onCheckedChange={onPerOccurrenceChange} />
-        </div>
-      </TabsContent>
+        <ToggleRow
+          checked={perOccurrence}
+          onChange={onPerOccurrenceChange}
+          className="rounded-[10px] bg-muted"
+          title={<span className="font-semibold">A template for every letter</span>}
+          description={
+            perOccurrence
+              ? "Repeated letters (the two P’s in HAPPY) each get their own template."
+              : "One template per distinct letter: trace it as many times as you need."
+          }
+        />
+        <p className="text-xs text-muted-foreground">
+          Or{" "}
+          <button type="button" className={linkClass} onClick={() => onModeChange("pick")}>
+            pick exact letters
+          </button>{" "}
+          from A–Z, a–z, 0–9
+        </p>
+      </div>
+    );
+  }
 
-      <TabsContent value="pick" className="space-y-4">
-        <div className="flex flex-wrap gap-1.5">
-          <Button size="sm" variant="secondary" onClick={() => onPickedChange(LETTER_GROUPS[0].chars)}>
-            Full alphabet
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => onPickedChange([...LETTER_GROUPS[0].chars, ...LETTER_GROUPS[2].chars])}
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap gap-1.5">
+        {[
+          { label: "Full alphabet", chars: LETTER_GROUPS[0].chars },
+          { label: "A–Z + 0–9", chars: [...LETTER_GROUPS[0].chars, ...LETTER_GROUPS[2].chars] },
+          { label: "Clear", chars: [] },
+        ].map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            onClick={() => onPickedChange(preset.chars)}
+            className="h-[30px] cursor-pointer whitespace-nowrap rounded-lg border px-2.5 text-[13px] transition-colors hover:border-primary/50 hover:bg-accent"
           >
-            A–Z + 0–9
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => onPickedChange([])}>
-            Clear
-          </Button>
-        </div>
-        {LETTER_GROUPS.map((group) => {
-          const all = group.chars.every((c) => pickedSet.has(c));
-          return (
-            <div key={group.id} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</span>
-                <button
-                  type="button"
-                  className="text-xs font-medium text-primary hover:underline cursor-pointer"
-                  onClick={() => setGroup(group.chars, !all)}
-                >
-                  {all ? "None" : "All"}
-                </button>
-              </div>
-              <div className="grid grid-cols-9 gap-1">
-                {group.chars.map((c) => {
-                  const on = pickedSet.has(c);
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => toggle(c)}
-                      className={cn(
-                        "flex aspect-square items-center justify-center rounded-md border text-sm font-semibold transition cursor-pointer",
-                        on
-                          ? "border-primary bg-primary text-primary-foreground shadow-xs"
-                          : "bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground",
-                        missing.includes(c) && on && "border-destructive bg-destructive/80",
-                      )}
-                    >
-                      {c}
-                    </button>
-                  );
-                })}
-              </div>
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      {LETTER_GROUPS.map((group) => {
+        const all = group.chars.every((c) => pickedSet.has(c));
+        return (
+          <div key={group.id} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[11px] uppercase tracking-[.06em] text-muted-foreground">
+                {group.label}
+              </span>
+              <button type="button" className={cn(linkClass, "text-xs")} onClick={() => setGroup(group.chars, !all)}>
+                {all ? "None" : "All"}
+              </button>
             </div>
-          );
-        })}
-      </TabsContent>
-    </Tabs>
+            <div className="grid grid-cols-9 gap-1">
+              {group.chars.map((c) => {
+                const on = pickedSet.has(c);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggle(c)}
+                    className={cn(
+                      "flex aspect-square cursor-pointer items-center justify-center rounded-md border text-sm font-semibold transition",
+                      on
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                      missing.includes(c) && on && "border-destructive bg-destructive/80",
+                    )}
+                  >
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-xs text-muted-foreground">
+        Or{" "}
+        <button type="button" className={linkClass} onClick={() => onModeChange("text")}>
+          type your banner words
+        </button>{" "}
+        instead
+      </p>
+    </div>
   );
 }
