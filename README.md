@@ -80,8 +80,10 @@ src/
 
 ## Deploying
 
-The included GitHub Actions workflow publishes the site to GitHub Pages on every push to `main` once the repository
-is public (Settings → Pages → Source: GitHub Actions). Because the build uses relative paths, `dist/` can also be
+The included GitHub Actions workflow publishes the site to GitHub Pages on every push to `main`. Pages has to be
+switched on once by hand (the workflow's token is not allowed to do it): in the repository go to
+**Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**. On the free plan the repository
+must be public; the deploy job is skipped while it is private. Because the build uses relative paths, `dist/` can also be
 hosted on Netlify, Vercel, Cloudflare Pages or any static host.
 
 ## Contributing
