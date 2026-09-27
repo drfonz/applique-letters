@@ -134,7 +134,9 @@ export function flattenCommands(commands: PathCommand[], scale: number, toleranc
 type IntPath = ClipperLib.IntPoint[];
 
 function toClipper(rings: Vec2[][]): IntPath[] {
-  return rings.map((ring) => ring.map(([x, y]) => ({ X: Math.round(x * CLIPPER_SCALE), Y: Math.round(y * CLIPPER_SCALE) })));
+  return rings.map((ring) =>
+    ring.map(([x, y]) => ({ X: Math.round(x * CLIPPER_SCALE), Y: Math.round(y * CLIPPER_SCALE) })),
+  );
 }
 
 function fromClipper(path: IntPath): Vec2[] {
@@ -184,7 +186,12 @@ export function cleanAndOffset(rings: Vec2[][], offsetMm = 0): Region[] {
   if (Math.abs(offsetMm) < 1e-6) {
     const c2 = new ClipperLib.Clipper();
     c2.AddPaths(union, ClipperLib.PolyType.ptSubject, true);
-    c2.Execute(ClipperLib.ClipType.ctUnion, tree, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
+    c2.Execute(
+      ClipperLib.ClipType.ctUnion,
+      tree,
+      ClipperLib.PolyFillType.pftNonZero,
+      ClipperLib.PolyFillType.pftNonZero,
+    );
   } else {
     // ArcTolerance controls how finely round corners are approximated.
     const offset = new ClipperLib.ClipperOffset(2, 0.05 * CLIPPER_SCALE);
@@ -246,48 +253,3 @@ export function glyphRings(font: Font, char: string, capHeightMm: number): Vec2[
   const path = font.charToGlyph(char).getPath(0, 0, font.unitsPerEm);
   return flattenCommands(path.commands, scale);
 }
-
-/** Built-in decorative shapes, handy for banners (hearts between words, stars…). */
-export const SYMBOLS: Record<string, { label: string; rings: (size: number) => Vec2[][] }> = {
-  "♥": {
-    label: "Heart",
-    rings: (size) => {
-      const pts: Vec2[] = [];
-      const n = 160;
-      for (let i = 0; i < n; i++) {
-        const t = (i / n) * Math.PI * 2;
-        const x = 16 * Math.sin(t) ** 3;
-        const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
-        pts.push([x, y]);
-      }
-      // The parametric heart spans roughly y ∈ [-17, 12]; scale it to the requested height.
-      const s = size / 29;
-      return [pts.map(([x, y]): Vec2 => [x * s, (y + 17) * s]).reverse()];
-    },
-  },
-  "★": {
-    label: "Star",
-    rings: (size) => {
-      const pts: Vec2[] = [];
-      const outer = size / (1 + Math.cos(Math.PI / 5));
-      const inner = outer * 0.45;
-      for (let i = 0; i < 10; i++) {
-        const a = Math.PI / 2 + (i * Math.PI) / 5;
-        const r = i % 2 === 0 ? outer : inner;
-        pts.push([r * Math.cos(a), r * Math.sin(a)]);
-      }
-      return [pts];
-    },
-  },
-  "●": {
-    label: "Circle",
-    rings: (size) => {
-      const pts: Vec2[] = [];
-      for (let i = 0; i < 128; i++) {
-        const a = (i / 128) * Math.PI * 2;
-        pts.push([(size / 2) * Math.cos(a), (size / 2) * Math.sin(a)]);
-      }
-      return [pts];
-    },
-  },
-};

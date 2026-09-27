@@ -1,13 +1,25 @@
 import { ToggleRow } from "@/components/ToggleRow";
+import { SHAPE_GROUPS, SHAPES } from "@/lib/shapes";
 import { cn } from "@/lib/utils";
 
 export type LetterMode = "text" | "pick";
+
+function shapesIn(group: string) {
+  return Object.entries(SHAPES)
+    .filter(([, s]) => s.group === group)
+    .map(([c, s]) => ({ c, label: s.label }));
+}
 
 export const LETTER_GROUPS: { id: string; label: string; chars: string[] }[] = [
   { id: "upper", label: "Capitals", chars: Array.from("ABCDEFGHIJKLMNOPQRSTUVWXYZ") },
   { id: "lower", label: "Lower case", chars: Array.from("abcdefghijklmnopqrstuvwxyz") },
   { id: "digits", label: "Numbers", chars: Array.from("0123456789") },
   { id: "symbols", label: "Symbols & shapes", chars: Array.from("♥★●&!?'.,-+#@£") },
+  ...SHAPE_GROUPS.filter((g) => g.id !== "basic").map((g) => ({
+    id: g.id,
+    label: g.label,
+    chars: shapesIn(g.id).map((s) => s.c),
+  })),
 ];
 
 const ALL_CHARS = LETTER_GROUPS.flatMap((g) => g.chars);
@@ -34,12 +46,6 @@ interface LetterPickerProps {
   /** CSS font family used to show the banner text in the chosen typeface. */
   fontFamily?: string;
 }
-
-const SHAPES = [
-  { c: "♥", label: "Heart" },
-  { c: "★", label: "Star" },
-  { c: "●", label: "Circle" },
-];
 
 const linkClass = "cursor-pointer font-medium text-primary hover:underline";
 
@@ -84,18 +90,24 @@ export function LetterPicker(props: LetterPickerProps) {
           className="resize-none rounded-[10px] border bg-background px-3.5 py-3 text-[26px] leading-[1.15] tracking-[.02em] outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
           style={{ fontFamily: fontFamily ? `"${fontFamily}", var(--font-display)` : "var(--font-display)" }}
         />
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs text-muted-foreground">Add</span>
-          {SHAPES.map(({ c, label }) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => onTextChange(text + c)}
-              aria-label={`Add a ${label.toLowerCase()}`}
-              className="h-[30px] shrink-0 cursor-pointer whitespace-nowrap rounded-lg border px-2.5 text-[13px] transition-colors hover:border-primary/50 hover:bg-accent"
-            >
-              {c} {label}
-            </button>
+        <div className="flex flex-col gap-1.5">
+          {SHAPE_GROUPS.map((group) => (
+            <div key={group.id} className="flex flex-wrap items-center gap-1">
+              <span className="w-[58px] shrink-0 text-[11px] text-muted-foreground">
+                {group.id === "basic" ? "Add" : group.label}
+              </span>
+              {shapesIn(group.id).map(({ c, label }) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => onTextChange(text + c)}
+                  aria-label={`Add a ${label.toLowerCase()}`}
+                  className="h-[30px] shrink-0 cursor-pointer whitespace-nowrap rounded-lg border px-2 text-[13px] transition-colors hover:border-primary/50 hover:bg-accent"
+                >
+                  {c} {label}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
         <ToggleRow
@@ -158,6 +170,8 @@ export function LetterPicker(props: LetterPickerProps) {
                     key={c}
                     type="button"
                     aria-pressed={on}
+                    aria-label={SHAPES[c]?.label}
+                    title={SHAPES[c]?.label}
                     onClick={() => toggle(c)}
                     className={cn(
                       "flex aspect-square cursor-pointer items-center justify-center rounded-md border text-sm font-semibold transition",

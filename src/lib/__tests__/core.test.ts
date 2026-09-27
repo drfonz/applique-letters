@@ -10,6 +10,7 @@ import { PRINTERS, keepOutAreas } from "../printers";
 import { bedToTemplate, buildPlates, templateToBed } from "../plates";
 import { boundsOf, differenceRegions, regionArea, regionRings } from "../geometry";
 import { latticeRegions } from "../lattice";
+import { SHAPES } from "../shapes";
 
 function loadFont(file: string) {
   const buf = readFileSync(resolve(__dirname, "../../../node_modules/@fontsource", file));
@@ -71,6 +72,28 @@ describe("templates", () => {
     expect(templates.find((t) => t.char === "a")!.slug).toBe("a-lower");
   });
 
+  it("draws every built-in shape as one printable piece", () => {
+    const shapes = Object.keys(SHAPES);
+    for (const settings of [base, { ...base, letterHeight: 30 }, { ...base, outlineOffset: -2 }]) {
+      const { templates, missing } = buildTemplates(fredoka, shapes, settings);
+      expect(missing).toEqual([]);
+      expect(templates).toHaveLength(shapes.length);
+      for (const tpl of templates)
+        expect(tpl.pieces, `${tpl.char} at ${settings.letterHeight} mm, ${settings.outlineOffset} mm offset`).toBe(1);
+    }
+    const { templates } = buildTemplates(fredoka, shapes, base);
+    const holes = (c: string) => templates.find((t) => t.char === c)!.regions[0].holes.length;
+    expect(holes("👻")).toBe(3); // two eyes and a mouth
+    expect(holes("🎃")).toBe(4); // two eyes, a nose and a grin
+    expect(templates.find((t) => t.char === "👻")!.height).toBeCloseTo(100, 0);
+    expect(templates.find((t) => t.char === "🦇")!.height).toBeCloseTo(60, 0);
+    expect(templates.find((t) => t.char === "🎃")!.slug).toBe("pumpkin");
+  });
+
+  it("ignores the emoji variation selector that phone keyboards add", () => {
+    expect([...countCharacters("BOO 👻\uFE0F🎃").keys()]).toEqual(["B", "O", "👻", "🎃"]);
+  });
+
   it("grows the outline by the offset", () => {
     const plain = buildTemplates(fredoka, ["I"], base).templates[0];
     const grown = buildTemplates(fredoka, ["I"], { ...base, outlineOffset: 5 }).templates[0];
@@ -80,7 +103,7 @@ describe("templates", () => {
 
 describe("mesh", () => {
   it("extrudes watertight solids with the right volume", () => {
-    const { templates } = buildTemplates(fredoka, chars("ABOR♥i★8"), base);
+    const { templates } = buildTemplates(fredoka, chars("ABOR♥i★8👻🎃🦇🎄🎁🪩"), base);
     const t = thicknessOf(base);
     for (const tpl of templates) {
       const mesh = extrudeRegions(tpl.regions, t);

@@ -6,6 +6,7 @@ import { regionsToPathData } from "@/lib/export";
 import type { LetterTemplate } from "@/lib/templates";
 import type { Region, Vec2 } from "@/lib/geometry";
 import type { HandlePlacement } from "@/lib/handle";
+import { SHAPES } from "@/lib/shapes";
 import { cn } from "@/lib/utils";
 
 interface LetterCardProps {
@@ -145,7 +146,12 @@ export function LetterCard({
       </div>
       <div className="mt-2 flex items-center justify-between gap-1">
         <div className="min-w-0">
-          <div className="text-sm font-semibold">{template.char}</div>
+          <div className="truncate text-sm font-semibold">
+            {template.char}
+            {SHAPES[template.char] && (
+              <span className="ml-1 font-normal text-muted-foreground">{SHAPES[template.char].label}</span>
+            )}
+          </div>
           <div className="whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
             {Math.round(template.width)} × {Math.round(template.height)} mm
           </div>
