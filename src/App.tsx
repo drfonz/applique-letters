@@ -24,8 +24,9 @@ import {
   type HandlePlacement,
   type HandleSettings,
 } from "@/lib/handle";
-import { regionArea, transformRegions, type Region, type Vec2 } from "@/lib/geometry";
+import { transformRegions, type Region, type Vec2 } from "@/lib/geometry";
 import { latticeRegions, type LatticeSettings } from "@/lib/lattice";
+import { formatGrams, grams as filamentGrams, printedHandleVolume, printedVolume } from "@/lib/filament";
 import type { NestOptions } from "@/lib/nest";
 import { printPaperTemplates } from "@/lib/paper";
 import { bedToTemplate, buildPlates, templateToBed, type PlacedLetter, type PlateLayout } from "@/lib/plates";
@@ -42,7 +43,6 @@ import { cn } from "@/lib/utils";
 // three.js is large, so the 3D view is only loaded when it is first opened.
 const Plate3D = lazy(() => import("@/components/Plate3D").then((m) => ({ default: m.Plate3D })));
 
-const PLA_DENSITY = 1.24; // g/cm³
 const REPO_URL = "https://github.com/drfonz/applique-letters";
 const STUDIO_URL = "https://indigolabs.studio";
 const LAYER_HEIGHTS = [0.12, 0.16, 0.2, 0.28];
@@ -383,14 +383,31 @@ export default function App() {
     [bodies],
   );
   const reducedHandles = templates.filter((t) => handles.get(t.char)?.reduced).map((t) => t.char);
-  const grams =
-    (templates.reduce((s, t) => {
+  // Filament per copy of each character, as a slicer would print it.
+  // Working out the infill takes a while for a lattice, so each body keeps its last answer:
+  // dragging one handle then only re-measures that letter.
+  const layerHeight = settings.layerHeight;
+  const volumeCache = useRef(new WeakMap<Region[], { key: string; volume: number }>());
+  const gramsEach = useMemo(() => {
+    const result = new Map<string, number>();
+    const key = `${thickness}/${layerHeight}`;
+    for (const t of templates) {
       const h = handles.get(t.char);
-      const area = templateBody(t).reduce((a, r) => a + regionArea(r), 0);
-      return s + (area * thickness + (h ? handleVolume(h, handle.height) : 0)) * copiesFor(t.char);
-    }, 0) *
-      PLA_DENSITY) /
-    1000;
+      const regions = bodies.get(t.char) ?? t.regions;
+      let hit = volumeCache.current.get(regions);
+      if (hit?.key !== key) {
+        hit = { key, volume: printedVolume(regions, { thickness, layerHeight }) };
+        volumeCache.current.set(regions, hit);
+      }
+      const body = hit.volume;
+      const grip = h ? printedHandleVolume(handleVolume(h, handle.height), h.radius) : 0;
+      result.set(t.char, filamentGrams(body + grip));
+    }
+    return result;
+  }, [templates, bodies, handles, handle.height, thickness, layerHeight]);
+  const grams = templates.reduce((s, t) => s + (gramsEach.get(t.char) ?? 0) * copiesFor(t.char), 0);
+  const plateGrams = (plate: PlateLayout) =>
+    plate.letters.reduce((s, l) => s + (gramsEach.get(l.template.char) ?? 0), 0);
   const stale = packing.running || packing.templates !== templates;
 
   const plateObjects = (plate: PlateLayout) =>
@@ -489,7 +506,7 @@ export default function App() {
   const current = plates[selectedPlate];
   const result = packing.result && items.length > 0 ? packing.result : null;
   const optimal = !!result && !packing.running && result.plateCount <= result.lowerBound;
-  const gramsLabel = `${grams < 10 ? grams.toFixed(1) : Math.round(grams)} g`;
+  const gramsLabel = formatGrams(grams);
   const displayFamily = cssFamily(settings.font);
   const toggleSection = (id: SectionId) => setSection((s) => (s === id ? null : id));
 
@@ -1070,6 +1087,7 @@ export default function App() {
                   <PlateDetails
                     plate={current}
                     count={plates.length}
+                    grams={plateGrams(current)}
                     fontFamily={displayFamily}
                     disabled={stale}
                     on3mf={() => download3mf(current)}
@@ -1252,6 +1270,7 @@ function Segmented<T extends number | string>({
 function PlateDetails({
   plate,
   count,
+  grams,
   fontFamily,
   disabled,
   on3mf,
@@ -1260,6 +1279,8 @@ function PlateDetails({
 }: {
   plate: PlateLayout;
   count: number;
+  /** Estimated PLA for this plate. */
+  grams: number;
   fontFamily: string;
   disabled: boolean;
   on3mf: () => void;
@@ -1288,6 +1309,9 @@ function PlateDetails({
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: fill }} />
+        </div>
+        <div className="flex justify-between text-[13px] text-muted-foreground">
+          PLA for this plate<span className="font-mono text-foreground">≈ {formatGrams(grams)}</span>
         </div>
       </div>
       <div className="flex gap-2">

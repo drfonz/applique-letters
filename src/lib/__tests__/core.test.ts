@@ -10,6 +10,7 @@ import { PRINTERS, keepOutAreas } from "../printers";
 import { bedToTemplate, buildPlates, templateToBed } from "../plates";
 import { boundsOf, differenceRegions, regionArea, regionRings } from "../geometry";
 import { latticeRegions } from "../lattice";
+import { printedVolume } from "../filament";
 import { SHAPES, easterSunday, familiesInOrder } from "../shapes";
 
 function loadFont(file: string) {
@@ -415,5 +416,21 @@ describe("filament-saving lattice", () => {
     const thin = buildTemplates(fredoka, ["I"], { ...base, letterHeight: 30 }).templates[0];
     expect(latticeRegions(thin.regions, lattice)).toEqual(thin.regions);
     expect(latticeRegions(o.regions, { ...lattice, enabled: false })).toEqual(o.regions);
+  });
+});
+
+describe("filament", () => {
+  it("counts thin templates as solid and thick ones as walls plus sparse infill", () => {
+    const o = buildTemplates(fredoka, ["O"], base).templates[0];
+    // 1.2 mm is all top and bottom layers, so it prints solid.
+    expect(printedVolume(o.regions, { thickness: 1.2, layerHeight: 0.2 })).toBeCloseTo(o.area * 1.2, 0);
+    // At 3.2 mm the middle 1.6 mm is mostly infill: well under a solid block, well over the shells.
+    const thick = printedVolume(o.regions, { thickness: 3.2, layerHeight: 0.2 });
+    expect(thick).toBeLessThan(o.area * 3.2 * 0.8);
+    expect(thick).toBeGreaterThan(o.area * 1.6);
+    // The lattice is nearly all walls, so it saves less than its area suggests once thick.
+    const lattice = latticeRegions(o.regions, { enabled: true, border: 4, spacing: 10 }, []);
+    const latticeArea = lattice.reduce((a, r) => a + regionArea(r), 0);
+    expect(printedVolume(lattice, { thickness: 3.2, layerHeight: 0.2 })).toBeGreaterThan(latticeArea * 3.2 * 0.8);
   });
 });
