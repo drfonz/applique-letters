@@ -26,7 +26,7 @@ import {
 } from "@/lib/handle";
 import { transformRegions, type Region, type Vec2 } from "@/lib/geometry";
 import { latticeRegions, type LatticeSettings } from "@/lib/lattice";
-import { formatGrams, grams as filamentGrams, printedHandleVolume, printedVolume } from "@/lib/filament";
+import { FILAMENTS, formatGrams, grams as filamentGrams, printedHandleVolume, printedVolume } from "@/lib/filament";
 import type { NestOptions } from "@/lib/nest";
 import { printPaperTemplates } from "@/lib/paper";
 import { bedToTemplate, buildPlates, templateToBed, type PlacedLetter, type PlateLayout } from "@/lib/plates";
@@ -88,6 +88,10 @@ interface Settings extends TemplateSettings {
   allowRotation: boolean;
   /** Leave room for Bambu Studio's prime tower on Bambu printers. */
   primeTower: boolean;
+  /** Filament preset, for weight estimates. */
+  filament: string;
+  /** Density (g/cm³) used when the filament is "custom". */
+  filamentDensity: number;
   handle: HandleSettings;
   /** Handles moved by hand, per character, as fractions of the letter's width and height. */
   handlePositions: Record<string, [number, number]>;
@@ -114,6 +118,8 @@ const DEFAULTS: Settings = {
   spacing: 3,
   allowRotation: true,
   primeTower: false,
+  filament: "pla",
+  filamentDensity: 1.24,
   handle: { enabled: false, diameter: 12, height: 15 },
   handlePositions: {},
   lattice: { enabled: true, border: 4, spacing: 10 },
@@ -383,12 +389,12 @@ export default function App() {
     [bodies],
   );
   const reducedHandles = templates.filter((t) => handles.get(t.char)?.reduced).map((t) => t.char);
-  // Filament per copy of each character, as a slicer would print it.
+  // Printed volume (mm³) per copy of each character, as a slicer would print it.
   // Working out the infill takes a while for a lattice, so each body keeps its last answer:
   // dragging one handle then only re-measures that letter.
   const layerHeight = settings.layerHeight;
   const volumeCache = useRef(new WeakMap<Region[], { key: string; volume: number }>());
-  const gramsEach = useMemo(() => {
+  const volumeEach = useMemo(() => {
     const result = new Map<string, number>();
     const key = `${thickness}/${layerHeight}`;
     for (const t of templates) {
@@ -399,15 +405,22 @@ export default function App() {
         hit = { key, volume: printedVolume(regions, { thickness, layerHeight }) };
         volumeCache.current.set(regions, hit);
       }
-      const body = hit.volume;
       const grip = h ? printedHandleVolume(handleVolume(h, handle.height), h.radius) : 0;
-      result.set(t.char, filamentGrams(body + grip));
+      result.set(t.char, hit.volume + grip);
     }
     return result;
   }, [templates, bodies, handles, handle.height, thickness, layerHeight]);
-  const grams = templates.reduce((s, t) => s + (gramsEach.get(t.char) ?? 0) * copiesFor(t.char), 0);
+  const filament = FILAMENTS.find((f) => f.id === settings.filament) ?? FILAMENTS[0];
+  const density = filament.id === "custom" ? settings.filamentDensity : filament.density;
+  const grams = filamentGrams(
+    templates.reduce((s, t) => s + (volumeEach.get(t.char) ?? 0) * copiesFor(t.char), 0),
+    density,
+  );
   const plateGrams = (plate: PlateLayout) =>
-    plate.letters.reduce((s, l) => s + (gramsEach.get(l.template.char) ?? 0), 0);
+    filamentGrams(
+      plate.letters.reduce((s, l) => s + (volumeEach.get(l.template.char) ?? 0), 0),
+      density,
+    );
   const stale = packing.running || packing.templates !== templates;
 
   const plateObjects = (plate: PlateLayout) =>
@@ -540,7 +553,7 @@ export default function App() {
       </span>
       <span className="h-4 w-px bg-border" />
       <span>
-        <b className="font-medium text-foreground">{gramsLabel}</b> PLA
+        <b className="font-medium text-foreground">{gramsLabel}</b> {filament.short}
       </span>
     </>
   );
@@ -849,7 +862,7 @@ export default function App() {
                 id="printer"
                 index="04"
                 title="Printer"
-                summary={`${printer.id === "custom" ? "Custom" : printer.name} · ${bed.width} × ${bed.depth}`}
+                summary={`${printer.id === "custom" ? "Custom" : printer.name} · ${bed.width} × ${bed.depth} · ${filament.id === "custom" ? `${density} g/cm³` : filament.name}`}
                 open={section === "printer"}
                 onToggle={toggleSection}
               >
@@ -901,6 +914,37 @@ export default function App() {
                       ))}
                     </div>
                   )}
+                  <div className="space-y-2">
+                    <Label htmlFor="filament" className="text-[13px] font-normal">
+                      Filament
+                    </Label>
+                    <div className="flex gap-2">
+                      <Select value={filament.id} onValueChange={(id) => set("filament", id)}>
+                        <SelectTrigger
+                          id="filament"
+                          className="h-10 min-w-0 flex-1 rounded-[10px] bg-background"
+                          aria-label="Filament"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FILAMENTS.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              {f.name}
+                              {f.id !== "custom" && <span className="text-muted-foreground"> · {f.density} g/cm³</span>}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {filament.id === "custom" && (
+                        <DensityInput value={settings.filamentDensity} onChange={(v) => set("filamentDensity", v)} />
+                      )}
+                    </div>
+                    <p className="text-xs leading-normal text-muted-foreground">
+                      Only changes the weight estimate. For the closest figure, match the density in your slicer’s
+                      filament settings.
+                    </p>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <SliderField
                       compact
@@ -1279,7 +1323,7 @@ function PlateDetails({
 }: {
   plate: PlateLayout;
   count: number;
-  /** Estimated PLA for this plate. */
+  /** Estimated filament for this plate. */
   grams: number;
   fontFamily: string;
   disabled: boolean;
@@ -1311,7 +1355,7 @@ function PlateDetails({
           <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: fill }} />
         </div>
         <div className="flex justify-between text-[13px] text-muted-foreground">
-          PLA for this plate<span className="font-mono text-foreground">≈ {formatGrams(grams)}</span>
+          Filament for this plate<span className="font-mono text-foreground">≈ {formatGrams(grams)}</span>
         </div>
       </div>
       <div className="flex gap-2">
@@ -1507,5 +1551,29 @@ function EmptyState({ running }: { running: boolean }) {
         </>
       )}
     </div>
+  );
+}
+
+/** Density box that lets people type freely ("1.", "1.3") and saves only sensible values. */
+function DensityInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+  // Accept a decimal comma too.
+  const parse = (text: string) => Number(text.replace(",", "."));
+  const valid = (v: number) => v >= 0.8 && v <= 3;
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      aria-label="Filament density (g/cm³)"
+      aria-invalid={!valid(parse(draft))}
+      className="h-10 w-[92px]"
+      value={draft}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        const v = parse(e.target.value);
+        if (valid(v)) onChange(v);
+      }}
+      onBlur={() => setDraft(String(value))}
+    />
   );
 }

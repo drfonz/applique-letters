@@ -22,6 +22,9 @@ Made by [Indigo Labs Studio](https://indigolabs.studio).
 - **Filament saver (on by default).** Each template is printed as a solid border to trace round, with an open
   diagonal lattice inside to keep it flat and stiff. That uses roughly half the filament of a solid template; parts
   too thin for a lattice stay solid, and so does the spot under a grip handle.
+- **Filament estimates that match the slicer.** Weights follow how slicers print (solid top and bottom layers, walls
+  and sparse infill between), for the whole set and for each plate. Pick your filament, or type the density from your
+  slicer's filament settings.
 - **Grip handle (optional).** A knob near the middle of each letter lets the template be held flat with a single
   fingertip while tracing, which helps anyone who finds spreading their fingers difficult. It is placed on solid
   material close to the letter's centre of mass, never overhangs the outline, prints upright without supports, and
