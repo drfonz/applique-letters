@@ -14,7 +14,7 @@ Made by [Indigo Labs Studio](https://indigolabs.studio).
 
 - **Any letters you like.** Type banner words ("HAPPY BIRTHDAY") or pick a subset of A–Z, a–z, 0–9 and symbols.
   Choose one template per distinct letter, or one for every letter in the text, and adjust copies per letter.
-- **Built-in shapes.** Hearts, stars and circles to put between words, plus seasonal families: ghosts, pumpkins, bats, spiders and witches’ hats for Halloween; trees, gifts, baubles, snowflakes, snowmen, holly and candy canes for Christmas; eggs, bunnies and chicks for Easter. “Add shape” opens a searchable picker with whichever family is in season listed first. Shapes show as tokens in the text box (click one to remove it), and typing the emoji (👻 🎃 🎄 ❄ 🐰 …) works too.
+- **Built-in shapes.** Hearts, stars and circles to put between words, plus seasonal families: ghosts, pumpkins, bats, spiders and witches’ hats for Halloween; trees, gifts, baubles, snowflakes, snowmen, holly and candy canes for Christmas; eggs, bunnies and chicks for Easter. There are balloons, birthday cakes, party hats and bunting flags for celebrations; rings and doves for weddings; baby grows, rubber ducks, prams and rattles for babies; diyas, lotuses and rangoli flowers for Diwali; crescent moons, a moon and star and a fanous lantern for Eid and Ramadan; a menorah, dreidel and Star of David for Hanukkah; lanterns, firecrackers, fans and blossom for Lunar New Year; and a rainbow for Pride. Every shape is kept chunky enough to trace and cut out of fabric. “Add shape” opens a searchable picker with whichever family is in season listed first. Shapes show as tokens in the text box (click one to remove it), and typing the emoji (👻 🎃 🎄 ❄ 🐰 🎂 🪔 🌙 🕎 🏮 …) works too.
 - **Fonts.** 20 hand-picked chunky Google Fonts ship with the app (so they work offline), you can search and use any of
   the 1,800+ Google Fonts at any weight, or upload your own TTF, OTF or WOFF file.
 - **Sizes that make sense for sewing.** Letter height is the capital height, so every letter in a set matches. Add a
@@ -80,7 +80,7 @@ core package straight from its source, so there is no build step between editing
 packages/core/src/   @indigolabs/applique-core: runs in browsers and in Node
   geometry.ts        glyph flattening, polygon clean-up and offsetting
   templates.ts       builds a template (outline) for each character
-  shapes.ts          built-in shapes (hearts, stars, seasonal families)
+  shapes.ts          built-in shapes (hearts, stars, celebrations, festivals)
   lattice.ts         filament saver: solid border with an open lattice inside
   filament.ts        printed volume and weight, as a slicer prints it
   mesh.ts            watertight extrusion
@@ -114,7 +114,7 @@ Ideas, bug reports and pull requests are very welcome. Some things on the wish l
 
 - A small engraved label on each template (useful for telling "b", "d", "p" and "q" apart).
 - Optional connecting bridges for letters with separate parts (the dot on an "i").
-- More shapes (flowers, bunting flags, leaves).
+- More shapes (leaves, animals, sports), and more festivals: suggestions welcome.
 
 ## Licence
 

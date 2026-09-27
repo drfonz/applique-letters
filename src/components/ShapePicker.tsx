@@ -145,11 +145,8 @@ export function ShapePicker({ onPick, selected, aside }: ShapePickerProps) {
                 </button>
               </Popover.Close>
             </div>
-            <div
-              className="flex gap-1 overflow-x-auto [scrollbar-width:none]"
-              role="tablist"
-              aria-label="Shape families"
-            >
+            {/* Wraps rather than scrolls: with a dozen families, a hidden scroll hid most of them. */}
+            <div className="flex flex-wrap gap-1" role="tablist" aria-label="Shape families">
               {tabs.map((t) => (
                 <button
                   key={t.id}
