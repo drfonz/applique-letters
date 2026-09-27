@@ -101,7 +101,6 @@ Bump `version` in `packages/core/package.json`, then push a tag such as `core-v0
 tests and **stages** the package on npm with provenance. Nothing is public until a maintainer approves it with 2FA,
 either on the package's page on npmjs.com or with `npm stage list` and `npm stage approve <id>`.
 
-
 ## Deploying
 
 The included GitHub Actions workflow publishes the site to GitHub Pages on every push to `main`. Pages has to be
