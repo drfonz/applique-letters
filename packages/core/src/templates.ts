@@ -1,4 +1,4 @@
-import type { Font } from "opentype.js";
+import type { Font } from "./font-types.js";
 import {
   boundsOf,
   cleanAndOffset,
@@ -9,9 +9,9 @@ import {
   regionArea,
   transformRegions,
   type Region,
-} from "./geometry";
-import { extrudeRegions, type Mesh } from "./mesh";
-import { SHAPES, shapeRings } from "./shapes";
+} from "./geometry.js";
+import { extrudeRegions, type Mesh } from "./mesh.js";
+import { SHAPES, shapeRings } from "./shapes.js";
 
 export interface TemplateSettings {
   /** Height of capital letters in millimetres. */

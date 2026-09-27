@@ -1,21 +1,23 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import opentype from "opentype.js";
-import { buildTemplates, countCharacters, thicknessOf, type TemplateSettings } from "../templates";
-import { extrudeRegions, meshVolume, mergeMeshes } from "../mesh";
-import { meshToStl, meshesTo3mf } from "../export";
-import { nest, placedRegions } from "../nest";
-import { PRINTERS, keepOutAreas } from "../printers";
-import { bedToTemplate, buildPlates, templateToBed } from "../plates";
-import { boundsOf, differenceRegions, regionArea, regionRings } from "../geometry";
-import { latticeRegions } from "../lattice";
-import { printedVolume } from "../filament";
-import { SHAPES, easterSunday, familiesInOrder } from "../shapes";
+import { buildTemplates, countCharacters, thicknessOf, type TemplateSettings } from "../templates.js";
+import { extrudeRegions, meshVolume, mergeMeshes } from "../mesh.js";
+import { meshToStl, meshesTo3mf } from "../export.js";
+import { nest, placedRegions } from "../nest.js";
+import { PRINTERS, keepOutAreas } from "../printers.js";
+import { bedToTemplate, buildPlates, templateToBed } from "../plates.js";
+import { boundsOf, differenceRegions, regionArea, regionRings } from "../geometry.js";
+import { latticeRegions } from "../lattice.js";
+import { printedVolume } from "../filament.js";
+import { SHAPES, easterSunday, familiesInOrder } from "../shapes.js";
+import { parseFont } from "../fonts.js";
+
+const require = createRequire(import.meta.url);
 
 function loadFont(file: string) {
-  const buf = readFileSync(resolve(__dirname, "../../../node_modules/@fontsource", file));
-  return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  const buf = readFileSync(require.resolve(`@fontsource/${file}`));
+  return parseFont(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 }
 
 const fredoka = loadFont("fredoka/files/fredoka-latin-700-normal.woff");
@@ -251,7 +253,7 @@ describe("nesting", () => {
 });
 
 import ClipperLib from "clipper-lib";
-import { cleanAndOffset, type Region } from "../geometry";
+import { cleanAndOffset, type Region } from "../geometry.js";
 
 function intersectionArea(a: Region[], b: Region[], grow: number): number {
   const ga = cleanAndOffset(
@@ -283,7 +285,7 @@ function intersectionArea(a: Region[], b: Region[], grow: number): number {
   return regions.reduce((s, r) => s + Math.abs(regionArea(r)), 0) > 0.5 ? 1 : 0;
 }
 
-import { canPlaceHandle, handleMesh, placeHandle, templateSolid } from "../handle";
+import { canPlaceHandle, handleMesh, placeHandle, templateSolid } from "../handle.js";
 
 describe("grip handle", () => {
   const settings = { enabled: true, diameter: 12, height: 15 };

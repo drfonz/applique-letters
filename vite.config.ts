@@ -10,6 +10,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      // Use the core package's source directly, so changes show up without a build.
+      "@indigolabs/applique-core": path.resolve(__dirname, "packages/core/src/index.ts"),
       // Direct access to the font files inside @fontsource packages.
       "@fontfiles": path.resolve(__dirname, "node_modules/@fontsource"),
     },

@@ -1,5 +1,5 @@
 import ClipperLib from "clipper-lib";
-import type { PathCommand } from "opentype.js";
+import type { PathCommand } from "./font-types.js";
 import {
   boundsOf,
   differenceRegions,
@@ -8,7 +8,7 @@ import {
   signedArea,
   unionRegions,
   type Vec2,
-} from "./geometry";
+} from "./geometry.js";
 
 /**
  * Built-in decorative shapes, keyed by the character that stands for them in banner text.

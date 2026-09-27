@@ -6,7 +6,7 @@ import {
   signedArea,
   type Region,
   type Vec2,
-} from "./geometry";
+} from "./geometry.js";
 
 /**
  * Filament saver: a template only needs a solid border to trace round. Inside that border

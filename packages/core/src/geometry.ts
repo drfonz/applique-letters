@@ -1,5 +1,5 @@
 import ClipperLib from "clipper-lib";
-import type { Font, PathCommand } from "opentype.js";
+import type { Font, PathCommand } from "./font-types.js";
 
 /** A 2D point in millimetres. */
 export type Vec2 = [number, number];

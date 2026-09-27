@@ -12,7 +12,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "types": ["vite/client"],
-    "paths": { "@/*": ["./src/*"] }
+    "paths": {
+      "@/*": ["./src/*"],
+      "@indigolabs/applique-core": ["./packages/core/src/index.ts"]
+    }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "packages/core/src/opentype.d.ts", "vite.config.ts"]
 }

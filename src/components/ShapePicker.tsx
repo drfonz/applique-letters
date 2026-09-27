@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Popover } from "radix-ui";
 import { Plus } from "lucide-react";
-import { SHAPES, familiesInOrder, shapesIn, type ShapeGroup } from "@/lib/shapes";
+import { SHAPES, familiesInOrder, shapesIn, type ShapeGroup } from "@indigolabs/applique-core";
 import { cn } from "@/lib/utils";
 
 /** The basics are plain glyphs rather than emoji, so give them the letter colours. */

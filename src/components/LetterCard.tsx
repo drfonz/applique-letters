@@ -2,11 +2,11 @@ import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Download, Minus, Plus, RotateCcw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { regionsToPathData } from "@/lib/export";
-import type { LetterTemplate } from "@/lib/templates";
-import type { Region, Vec2 } from "@/lib/geometry";
-import type { HandlePlacement } from "@/lib/handle";
-import { SHAPES } from "@/lib/shapes";
+import { regionsToPathData } from "@indigolabs/applique-core";
+import type { LetterTemplate } from "@indigolabs/applique-core";
+import type { Region, Vec2 } from "@indigolabs/applique-core";
+import type { HandlePlacement } from "@indigolabs/applique-core";
+import { SHAPES } from "@indigolabs/applique-core";
 import { cn } from "@/lib/utils";
 
 interface LetterCardProps {

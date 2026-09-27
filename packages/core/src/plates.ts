@@ -1,6 +1,6 @@
-import { boundsOf, type Region, type Vec2 } from "./geometry";
-import { placedRegions, type NestPlacement, type NestResult } from "./nest";
-import type { LetterTemplate } from "./templates";
+import { boundsOf, type Region, type Vec2 } from "./geometry.js";
+import { placedRegions, type NestPlacement, type NestResult } from "./nest.js";
+import type { LetterTemplate } from "./templates.js";
 
 export interface PlacedLetter {
   template: LetterTemplate;

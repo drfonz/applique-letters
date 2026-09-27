@@ -57,34 +57,48 @@ Made by [Indigo Labs Studio](https://indigolabs.studio).
 
 ## Development
 
-Requires Node.js 20 or later.
+Requires Node.js 22 or later. The repository is an npm workspace: the web app lives at the root and the geometry
+engine is published separately as [`@indigolabs/applique-core`](packages/core), so other projects can build the same
+templates.
 
 ```bash
 npm install
 npm run dev        # start the dev server
-npm test           # geometry, mesh and nesting tests
-npm run typecheck
+npm test           # geometry, mesh and nesting tests (in packages/core)
+npm run typecheck  # app and core
 npm run build      # static site in dist/
+npm run build:core # compile the core package to packages/core/dist
 ```
 
 The UI is React 19 + TypeScript + Vite, styled with Tailwind CSS v4 and [shadcn/ui](https://ui.shadcn.com) components
-(in `src/components/ui`). The 3D preview uses three.js and is loaded on demand.
+(in `src/components/ui`). The 3D preview uses three.js and is loaded on demand. In development the app compiles the
+core package straight from its source, so there is no build step between editing the two.
 
 ### Project layout
 
 ```
+packages/core/src/   @indigolabs/applique-core: runs in browsers and in Node
+  geometry.ts        glyph flattening, polygon clean-up and offsetting
+  templates.ts       builds a template (outline) for each character
+  shapes.ts          built-in shapes (hearts, stars, seasonal families)
+  lattice.ts         filament saver: solid border with an open lattice inside
+  filament.ts        printed volume and weight, as a slicer prints it
+  mesh.ts            watertight extrusion
+  handle.ts          optional grip handle: placement and solid
+  nest.ts            plate optimiser
+  plates.ts          nesting output as per-plate layouts
+  printers.ts        printer presets and keep-out areas
+  export.ts          STL, 3MF, SVG and ZIP writers
+  fonts.ts           bundled font list, Google Fonts catalogue, font parsing
 src/
-  lib/
-    geometry.ts   glyph flattening, polygon clean-up and offsetting, built-in shapes
-    templates.ts  builds a template (outline) for each character
-    mesh.ts       watertight extrusion
-    handle.ts     optional grip handle: placement and solid
-    nest.ts       plate optimiser (runs in nest.worker.ts)
-    export.ts     STL, 3MF, SVG and ZIP writers
-    fonts.ts      bundled fonts and the Google Fonts catalogue
-    paper.ts      A4 paper templates
-  components/     app components; ui/ holds the shadcn components
+  lib/               app-only code: bundled font files, Web Worker, paper printing, downloads
+  components/        app components; ui/ holds the shadcn components
 ```
+
+### Releasing the core package
+
+Bump `version` in `packages/core/package.json`, then push a tag such as `core-v0.2.0`. The release workflow builds,
+tests and publishes the package to npm with provenance.
 
 ## Deploying
 

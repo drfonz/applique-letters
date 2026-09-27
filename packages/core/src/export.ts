@@ -1,6 +1,6 @@
 import { strToU8, zipSync } from "fflate";
-import type { Mesh } from "./mesh";
-import type { Region } from "./geometry";
+import type { Mesh } from "./mesh.js";
+import type { Region } from "./geometry.js";
 
 /** Binary STL. */
 export function meshToStl(mesh: Mesh, name = "template"): Uint8Array<ArrayBuffer> {
@@ -101,16 +101,4 @@ export function regionsToPathData(regions: Region[], height: number, dx = 0, dy 
 
 export function zipFiles(files: Record<string, Uint8Array>): Uint8Array {
   return zipSync(files, { level: 6 });
-}
-
-export function downloadBlob(data: Uint8Array | string, filename: string, type: string) {
-  const blob = new Blob([data as BlobPart], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }

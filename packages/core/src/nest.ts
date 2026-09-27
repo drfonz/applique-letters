@@ -1,5 +1,5 @@
-import { cleanAndOffset, boundsOf, regionArea, type Region, type Vec2 } from "./geometry";
-import { rotateQuarter } from "./templates";
+import { cleanAndOffset, boundsOf, regionArea, type Region, type Vec2 } from "./geometry.js";
+import { rotateQuarter } from "./templates.js";
 
 /**
  * Plate nesting.

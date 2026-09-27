@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { NestItem, NestOptions, NestResult } from "@/lib/nest";
+import type { NestItem, NestOptions, NestResult } from "@indigolabs/applique-core";
 import type { NestRequest, NestResponse } from "@/lib/nest.worker";
-import type { LetterTemplate } from "@/lib/templates";
+import type { LetterTemplate } from "@indigolabs/applique-core";
 
 export interface PackingState {
   result: NestResult | null;
