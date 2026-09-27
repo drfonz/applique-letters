@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { nest, type NestItem, type NestOptions, type NestResult, type NestShape } from "@indigolabs/applique-core";
+import { nest, type NestItem, type NestOptions, type NestResult, type NestShape } from "@indigolabsltd/applique-core";
 
 export interface NestRequest {
   id: number;

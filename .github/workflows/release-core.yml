@@ -22,4 +22,4 @@ jobs:
       - run: npm ci
       - name: Check the tag matches the package version
         run: test "core-v$(node -p 'require("./packages/core/package.json").version')" = "$GITHUB_REF_NAME"
-      - run: npm publish -w @indigolabs/applique-core
+      - run: npm publish -w @indigolabsltd/applique-core

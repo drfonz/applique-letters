@@ -1,4 +1,4 @@
-import { BUNDLED_FONTS as CORE_FONTS, fontFamilyName, parseFont, type FontChoice } from "@indigolabs/applique-core";
+import { BUNDLED_FONTS as CORE_FONTS, fontFamilyName, parseFont, type FontChoice } from "@indigolabsltd/applique-core";
 
 import fredoka from "@fontfiles/fredoka/files/fredoka-latin-700-normal.woff?url";
 import luckiestGuy from "@fontfiles/luckiest-guy/files/luckiest-guy-latin-400-normal.woff?url";
@@ -29,7 +29,7 @@ export {
   type CatalogueFont,
   type FontCategory,
   type FontChoice,
-} from "@indigolabs/applique-core";
+} from "@indigolabsltd/applique-core";
 
 /** URLs of the bundled font files, which Vite copies into the build. */
 const FILES: Record<string, string> = {

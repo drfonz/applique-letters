@@ -1,9 +1,9 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { regionsToPathData } from "@indigolabs/applique-core";
-import type { Region, Vec2 } from "@indigolabs/applique-core";
-import type { HandlePlacement } from "@indigolabs/applique-core";
-import type { KeepOut } from "@indigolabs/applique-core";
-import type { PlacedLetter, PlateLayout } from "@indigolabs/applique-core";
+import { regionsToPathData } from "@indigolabsltd/applique-core";
+import type { Region, Vec2 } from "@indigolabsltd/applique-core";
+import type { HandlePlacement } from "@indigolabsltd/applique-core";
+import type { KeepOut } from "@indigolabsltd/applique-core";
+import type { PlacedLetter, PlateLayout } from "@indigolabsltd/applique-core";
 import { cn } from "@/lib/utils";
 
 const COLOURS = ["var(--letter-1)", "var(--letter-2)", "var(--letter-3)", "var(--letter-4)", "var(--letter-5)"];

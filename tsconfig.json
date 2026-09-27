@@ -14,7 +14,7 @@
     "types": ["vite/client"],
     "paths": {
       "@/*": ["./src/*"],
-      "@indigolabs/applique-core": ["./packages/core/src/index.ts"]
+      "@indigolabsltd/applique-core": ["./packages/core/src/index.ts"]
     }
   },
   "include": ["src", "packages/core/src/opentype.d.ts", "vite.config.ts"]

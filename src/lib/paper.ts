@@ -1,8 +1,8 @@
-import { nest } from "@indigolabs/applique-core";
-import { buildPlates } from "@indigolabs/applique-core";
-import { regionsToPathData } from "@indigolabs/applique-core";
-import { boundsOf } from "@indigolabs/applique-core";
-import type { LetterTemplate } from "@indigolabs/applique-core";
+import { nest } from "@indigolabsltd/applique-core";
+import { buildPlates } from "@indigolabsltd/applique-core";
+import { regionsToPathData } from "@indigolabsltd/applique-core";
+import { boundsOf } from "@indigolabsltd/applique-core";
+import type { LetterTemplate } from "@indigolabsltd/applique-core";
 
 const A4 = { width: 210, depth: 297 };
 

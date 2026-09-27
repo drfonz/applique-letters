@@ -1,4 +1,4 @@
-# @indigolabs/applique-core
+# @indigolabsltd/applique-core
 
 The geometry engine behind [Appliqué Letters](https://github.com/drfonz/applique-letters): it turns letters and shapes
 into templates for appliqué, bunting and quilting, and writes them out for 3D printing. It runs in browsers and in
@@ -15,7 +15,7 @@ Node.js 22+, with no DOM needed.
 
 ```ts
 import { readFile } from "node:fs/promises";
-import { buildTemplates, latticeRegions, parseFont, printedVolume, grams } from "@indigolabs/applique-core";
+import { buildTemplates, latticeRegions, parseFont, printedVolume, grams } from "@indigolabsltd/applique-core";
 
 const file = await readFile("Fredoka-Bold.woff");
 const font = parseFont(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength));

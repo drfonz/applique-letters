@@ -58,7 +58,7 @@ Made by [Indigo Labs Studio](https://indigolabs.studio).
 ## Development
 
 Requires Node.js 22 or later. The repository is an npm workspace: the web app lives at the root and the geometry
-engine is published separately as [`@indigolabs/applique-core`](packages/core), so other projects can build the same
+engine is published separately as [`@indigolabsltd/applique-core`](packages/core), so other projects can build the same
 templates.
 
 ```bash
@@ -77,7 +77,7 @@ core package straight from its source, so there is no build step between editing
 ### Project layout
 
 ```
-packages/core/src/   @indigolabs/applique-core: runs in browsers and in Node
+packages/core/src/   @indigolabsltd/applique-core: runs in browsers and in Node
   geometry.ts        glyph flattening, polygon clean-up and offsetting
   templates.ts       builds a template (outline) for each character
   shapes.ts          built-in shapes (hearts, stars, celebrations, festivals)

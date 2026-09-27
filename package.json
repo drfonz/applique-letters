@@ -9,9 +9,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b && npm run typecheck -w @indigolabs/applique-core",
-    "test": "npm test -w @indigolabs/applique-core",
-    "build:core": "npm run build -w @indigolabs/applique-core"
+    "typecheck": "tsc -b && npm run typecheck -w @indigolabsltd/applique-core",
+    "test": "npm test -w @indigolabsltd/applique-core",
+    "build:core": "npm run build -w @indigolabsltd/applique-core"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
@@ -36,7 +36,7 @@
     "@fontsource/shrikhand": "^5.3.0",
     "@fontsource/sniglet": "^5.3.0",
     "@fontsource/titan-one": "^5.3.0",
-    "@indigolabs/applique-core": "*",
+    "@indigolabsltd/applique-core": "*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.48.0",
