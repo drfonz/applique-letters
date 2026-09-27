@@ -98,7 +98,9 @@ src/
 ### Releasing the core package
 
 Bump `version` in `packages/core/package.json`, then push a tag such as `core-v0.2.0`. The release workflow builds,
-tests and publishes the package to npm with provenance.
+tests and **stages** the package on npm with provenance. Nothing is public until a maintainer approves it with 2FA,
+either on the package's page on npmjs.com or with `npm stage list` and `npm stage approve <id>`.
+
 
 ## Deploying
 

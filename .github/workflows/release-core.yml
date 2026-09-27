@@ -1,4 +1,4 @@
-name: Release core package
+name: Release core package (staged)
 
 on:
   push:
@@ -24,4 +24,11 @@ jobs:
       - run: npm ci
       - name: Check the tag matches the package version
         run: test "core-v$(node -p 'require("./packages/core/package.json").version')" = "$GITHUB_REF_NAME"
-      - run: npm publish -w @indigolabsltd/applique-core
+      - run: npm run build:core
+      - run: npm test
+      # Staged publishing: this uploads the version to npm but keeps it private until a
+      # maintainer approves it with 2FA (npmjs.com, or `npm stage approve <id>`). The trusted
+      # publisher only allows staging, so a compromised workflow cannot release on its own.
+      # `npm stage` does not understand workspaces, hence the working directory.
+      - run: npm stage publish
+        working-directory: packages/core
