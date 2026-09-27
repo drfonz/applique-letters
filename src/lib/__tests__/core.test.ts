@@ -10,7 +10,7 @@ import { PRINTERS, keepOutAreas } from "../printers";
 import { bedToTemplate, buildPlates, templateToBed } from "../plates";
 import { boundsOf, differenceRegions, regionArea, regionRings } from "../geometry";
 import { latticeRegions } from "../lattice";
-import { SHAPES } from "../shapes";
+import { SHAPES, easterSunday, familiesInOrder } from "../shapes";
 
 function loadFont(file: string) {
   const buf = readFileSync(resolve(__dirname, "../../../node_modules/@fontsource", file));
@@ -85,13 +85,34 @@ describe("templates", () => {
     const holes = (c: string) => templates.find((t) => t.char === c)!.regions[0].holes.length;
     expect(holes("👻")).toBe(3); // two eyes and a mouth
     expect(holes("🎃")).toBe(4); // two eyes, a nose and a grin
+    expect(holes("⛄")).toBe(6); // two eyes, a nose and three buttons
+    expect(holes("❄")).toBe(1); // the hexagon in the middle
     expect(templates.find((t) => t.char === "👻")!.height).toBeCloseTo(100, 0);
     expect(templates.find((t) => t.char === "🦇")!.height).toBeCloseTo(60, 0);
     expect(templates.find((t) => t.char === "🎃")!.slug).toBe("pumpkin");
   });
 
+  it("lists the family in season first", () => {
+    const order = (date: string) => familiesInOrder(new Date(date)).map((f) => f.id);
+    expect(order("2026-10-15")).toEqual(["halloween", "basic", "christmas", "easter"]);
+    expect(order("2026-12-01")).toEqual(["christmas", "basic", "halloween", "easter"]);
+    expect(order("2027-01-03")[0]).toBe("christmas"); // still Christmas until Twelfth Night
+    expect(order("2027-03-01")[0]).toBe("basic");
+    // Easter moves: 5 April 2026, 28 March 2027, 16 April 2028.
+    expect([2026, 2027, 2028].map((y) => easterSunday(y).toDateString())).toEqual([
+      new Date(2026, 3, 5).toDateString(),
+      new Date(2027, 2, 28).toDateString(),
+      new Date(2028, 3, 16).toDateString(),
+    ]);
+    expect(order("2027-03-10")[0]).toBe("easter");
+    expect(order("2027-04-04")[0]).toBe("easter");
+    expect(order("2027-04-05")[0]).toBe("basic");
+    expect(familiesInOrder(new Date("2026-10-15"))[0].inSeason).toBe(true);
+  });
+
   it("ignores the emoji variation selector that phone keyboards add", () => {
     expect([...countCharacters("BOO 👻\uFE0F🎃").keys()]).toEqual(["B", "O", "👻", "🎃"]);
+    expect([...countCharacters("❄\uFE0F🕷\uFE0F").keys()]).toEqual(["❄", "🕷"]);
   });
 
   it("grows the outline by the offset", () => {
@@ -103,7 +124,7 @@ describe("templates", () => {
 
 describe("mesh", () => {
   it("extrudes watertight solids with the right volume", () => {
-    const { templates } = buildTemplates(fredoka, chars("ABOR♥i★8👻🎃🦇🎄🎁🪩"), base);
+    const { templates } = buildTemplates(fredoka, chars("ABOR♥i★8👻🎃🦇🕷🧙🎄🎁🪩❄⛄🌿🍭🥚🐰🐣"), base);
     const t = thicknessOf(base);
     for (const tpl of templates) {
       const mesh = extrudeRegions(tpl.regions, t);

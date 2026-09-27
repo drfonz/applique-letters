@@ -75,6 +75,15 @@ const NAMED: Record<string, string> = {
   "🎄": "tree",
   "🎁": "gift",
   "🪩": "bauble",
+  "🕷": "spider",
+  "🧙": "witch-hat",
+  "❄": "snowflake",
+  "⛄": "snowman",
+  "🌿": "holly",
+  "🍭": "candy-cane",
+  "🥚": "egg",
+  "🐰": "bunny",
+  "🐣": "chick",
 };
 
 /** Case-insensitive file systems would merge "A.stl" and "a.stl", so lower case gets a suffix. */

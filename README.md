@@ -14,7 +14,7 @@ Made by [Indigo Labs Studio](https://indigolabs.studio).
 
 - **Any letters you like.** Type banner words ("HAPPY BIRTHDAY") or pick a subset of A–Z, a–z, 0–9 and symbols.
   Choose one template per distinct letter, or one for every letter in the text, and adjust copies per letter.
-- **Built-in shapes.** Hearts, stars and circles to put between words, plus seasonal sets: ghosts, pumpkins and bats for Halloween; trees, gifts and baubles for Christmas. Typing the emoji (👻 🎃 🦇 🎄 🎁 🪩) works too.
+- **Built-in shapes.** Hearts, stars and circles to put between words, plus seasonal families: ghosts, pumpkins, bats, spiders and witches’ hats for Halloween; trees, gifts, baubles, snowflakes, snowmen, holly and candy canes for Christmas; eggs, bunnies and chicks for Easter. “Add shape” opens a searchable picker with whichever family is in season listed first. Shapes show as tokens in the text box (click one to remove it), and typing the emoji (👻 🎃 🎄 ❄ 🐰 …) works too.
 - **Fonts.** 20 hand-picked chunky Google Fonts ship with the app (so they work offline), you can search and use any of
   the 1,800+ Google Fonts at any weight, or upload your own TTF, OTF or WOFF file.
 - **Sizes that make sense for sewing.** Letter height is the capital height, so every letter in a set matches. Add a

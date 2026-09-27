@@ -1,28 +1,20 @@
+import { BannerInput } from "@/components/BannerInput";
+import { ShapePicker, shapeTint } from "@/components/ShapePicker";
 import { ToggleRow } from "@/components/ToggleRow";
-import { SHAPE_GROUPS, SHAPES } from "@/lib/shapes";
+import { SHAPES } from "@/lib/shapes";
 import { cn } from "@/lib/utils";
 
 export type LetterMode = "text" | "pick";
-
-function shapesIn(group: string) {
-  return Object.entries(SHAPES)
-    .filter(([, s]) => s.group === group)
-    .map(([c, s]) => ({ c, label: s.label }));
-}
 
 export const LETTER_GROUPS: { id: string; label: string; chars: string[] }[] = [
   { id: "upper", label: "Capitals", chars: Array.from("ABCDEFGHIJKLMNOPQRSTUVWXYZ") },
   { id: "lower", label: "Lower case", chars: Array.from("abcdefghijklmnopqrstuvwxyz") },
   { id: "digits", label: "Numbers", chars: Array.from("0123456789") },
-  { id: "symbols", label: "Symbols & shapes", chars: Array.from("♥★●&!?'.,-+#@£") },
-  ...SHAPE_GROUPS.filter((g) => g.id !== "basic").map((g) => ({
-    id: g.id,
-    label: g.label,
-    chars: shapesIn(g.id).map((s) => s.c),
-  })),
+  { id: "symbols", label: "Symbols", chars: Array.from("&!?'.,-+#@£") },
 ];
 
-const ALL_CHARS = LETTER_GROUPS.flatMap((g) => g.chars);
+// Shapes come from the shape picker, and sort after everything else in the order they are defined.
+const ALL_CHARS = [...LETTER_GROUPS.flatMap((g) => g.chars), ...Object.keys(SHAPES)];
 
 /** Keep picked characters in a predictable, alphabet-like order. */
 export function sortChars(chars: Iterable<string>): string[] {
@@ -63,6 +55,7 @@ export function LetterPicker(props: LetterPickerProps) {
     fontFamily,
   } = props;
   const pickedSet = new Set(picked);
+  const pickedShapes = picked.filter((c) => SHAPES[c]);
   const toggle = (c: string) => {
     const next = new Set(pickedSet);
     if (next.has(c)) next.delete(c);
@@ -81,35 +74,14 @@ export function LetterPicker(props: LetterPickerProps) {
   if (mode === "text") {
     return (
       <div className="flex flex-col gap-3.5">
-        <textarea
+        <BannerInput
           value={text}
-          onChange={(e) => onTextChange(e.target.value)}
+          onChange={onTextChange}
           placeholder="HAPPY BIRTHDAY"
-          rows={2}
-          aria-label="Banner text"
-          className="resize-none rounded-[10px] border bg-background px-3.5 py-3 text-[26px] leading-[1.15] tracking-[.02em] outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+          className="text-[26px] leading-[1.15] tracking-[.02em]"
           style={{ fontFamily: fontFamily ? `"${fontFamily}", var(--font-display)` : "var(--font-display)" }}
         />
-        <div className="flex flex-col gap-1.5">
-          {SHAPE_GROUPS.map((group) => (
-            <div key={group.id} className="flex flex-wrap items-center gap-1">
-              <span className="w-[58px] shrink-0 text-[11px] text-muted-foreground">
-                {group.id === "basic" ? "Add" : group.label}
-              </span>
-              {shapesIn(group.id).map(({ c, label }) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => onTextChange(text + c)}
-                  aria-label={`Add a ${label.toLowerCase()}`}
-                  className="h-[30px] shrink-0 cursor-pointer whitespace-nowrap rounded-lg border px-2 text-[13px] transition-colors hover:border-primary/50 hover:bg-accent"
-                >
-                  {c} {label}
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
+        <ShapePicker onPick={(c) => onTextChange(text + c)} />
         <ToggleRow
           checked={perOccurrence}
           onChange={onPerOccurrenceChange}
@@ -170,8 +142,6 @@ export function LetterPicker(props: LetterPickerProps) {
                     key={c}
                     type="button"
                     aria-pressed={on}
-                    aria-label={SHAPES[c]?.label}
-                    title={SHAPES[c]?.label}
                     onClick={() => toggle(c)}
                     className={cn(
                       "flex aspect-square cursor-pointer items-center justify-center rounded-md border text-sm font-semibold transition",
@@ -189,6 +159,40 @@ export function LetterPicker(props: LetterPickerProps) {
           </div>
         );
       })}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[11px] uppercase tracking-[.06em] text-muted-foreground">Shapes</span>
+          {pickedShapes.length > 0 && (
+            <button type="button" className={cn(linkClass, "text-xs")} onClick={() => setGroup(pickedShapes, false)}>
+              None
+            </button>
+          )}
+        </div>
+        <ShapePicker
+          selected={pickedSet}
+          onPick={toggle}
+          aside={
+            <div className="flex flex-wrap gap-1">
+              {pickedShapes.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => toggle(c)}
+                  title={`Remove ${SHAPES[c].label.toLowerCase()}`}
+                  aria-label={`Remove ${SHAPES[c].label.toLowerCase()} shape`}
+                  className={cn(
+                    "flex size-[34px] cursor-pointer items-center justify-center rounded-[9px] border border-primary bg-accent text-[17px] transition-colors hover:border-destructive/60",
+                    missing.includes(c) && "border-destructive",
+                  )}
+                  style={{ color: shapeTint(c) }}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          }
+        />
+      </div>
       <p className="text-xs text-muted-foreground">
         Or{" "}
         <button type="button" className={linkClass} onClick={() => onModeChange("text")}>
