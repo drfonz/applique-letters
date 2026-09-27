@@ -9,8 +9,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b",
-    "test": "vitest run"
+    "typecheck": "tsc -b && npm run typecheck -w @indigolabsltd/applique-core",
+    "test": "npm test -w @indigolabsltd/applique-core",
+    "build:core": "npm run build -w @indigolabsltd/applique-core"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
@@ -35,13 +36,10 @@
     "@fontsource/shrikhand": "^5.3.0",
     "@fontsource/sniglet": "^5.3.0",
     "@fontsource/titan-one": "^5.3.0",
+    "@indigolabsltd/applique-core": "*",
     "class-variance-authority": "^0.7.1",
-    "clipper-lib": "^6.4.2",
     "clsx": "^2.1.1",
-    "earcut": "^3.2.3",
-    "fflate": "^0.8.3",
     "lucide-react": "^1.48.0",
-    "opentype.js": "^2.0.0",
     "radix-ui": "^1.6.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -50,7 +48,6 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
-    "@types/clipper-lib": "^6.4.0",
     "@types/node": "^26.6.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
@@ -68,6 +65,9 @@
     "url": "https://github.com/drfonz/applique-letters.git"
   },
   "engines": {
-    "node": ">=20.19"
-  }
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }

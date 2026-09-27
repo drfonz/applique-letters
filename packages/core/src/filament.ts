@@ -1,4 +1,4 @@
-import { cleanAndOffset, regionArea, regionRings, type Region } from "./geometry";
+import { cleanAndOffset, regionArea, regionRings, type Region } from "./geometry.js";
 
 /**
  * Filament estimates that follow what a slicer actually prints, rather than a solid block.

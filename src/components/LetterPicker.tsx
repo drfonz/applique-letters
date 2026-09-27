@@ -1,7 +1,7 @@
 import { BannerInput } from "@/components/BannerInput";
 import { ShapePicker, shapeTint } from "@/components/ShapePicker";
 import { ToggleRow } from "@/components/ToggleRow";
-import { SHAPES } from "@/lib/shapes";
+import { SHAPES } from "@indigolabsltd/applique-core";
 import { cn } from "@/lib/utils";
 
 export type LetterMode = "text" | "pick";

@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { Region, Vec2 } from "@/lib/geometry";
-import { handleMesh, type HandlePlacement, type HandleSettings } from "@/lib/handle";
-import { extrudeRegions, type Mesh } from "@/lib/mesh";
-import type { PlacedLetter, PlateLayout } from "@/lib/plates";
+import type { Region, Vec2 } from "@indigolabsltd/applique-core";
+import { handleMesh, type HandlePlacement, type HandleSettings } from "@indigolabsltd/applique-core";
+import { extrudeRegions, type Mesh } from "@indigolabsltd/applique-core";
+import type { PlacedLetter, PlateLayout } from "@indigolabsltd/applique-core";
 import { cn } from "@/lib/utils";
 
 const COLOURS = [0xe87a93, 0xe8b46a, 0x7fc59a, 0x78a6e0, 0xb48be0];

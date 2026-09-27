@@ -14,7 +14,7 @@ Made by [Indigo Labs Studio](https://indigolabs.studio).
 
 - **Any letters you like.** Type banner words ("HAPPY BIRTHDAY") or pick a subset of A–Z, a–z, 0–9 and symbols.
   Choose one template per distinct letter, or one for every letter in the text, and adjust copies per letter.
-- **Built-in shapes.** Hearts, stars and circles to put between words, plus seasonal families: ghosts, pumpkins, bats, spiders and witches’ hats for Halloween; trees, gifts, baubles, snowflakes, snowmen, holly and candy canes for Christmas; eggs, bunnies and chicks for Easter. “Add shape” opens a searchable picker with whichever family is in season listed first. Shapes show as tokens in the text box (click one to remove it), and typing the emoji (👻 🎃 🎄 ❄ 🐰 …) works too.
+- **Built-in shapes.** Hearts, stars and circles to put between words, plus seasonal families: ghosts, pumpkins, bats, spiders and witches’ hats for Halloween; trees, gifts, baubles, snowflakes, snowmen, holly and candy canes for Christmas; eggs, bunnies and chicks for Easter. There are balloons, birthday cakes, party hats and bunting flags for celebrations; rings and doves for weddings; baby grows, rubber ducks, prams and rattles for babies; diyas, lotuses and rangoli flowers for Diwali; crescent moons, a moon and star and a fanous lantern for Eid and Ramadan; a menorah, dreidel and Star of David for Hanukkah; lanterns, firecrackers, fans and blossom for Lunar New Year; and a rainbow for Pride. Every shape is kept chunky enough to trace and cut out of fabric. “Add shape” opens a searchable picker with whichever family is in season listed first. Shapes show as tokens in the text box (click one to remove it), and typing the emoji (👻 🎃 🎄 ❄ 🐰 🎂 🪔 🌙 🕎 🏮 …) works too.
 - **Fonts.** 20 hand-picked chunky Google Fonts ship with the app (so they work offline), you can search and use any of
   the 1,800+ Google Fonts at any weight, or upload your own TTF, OTF or WOFF file.
 - **Sizes that make sense for sewing.** Letter height is the capital height, so every letter in a set matches. Add a
@@ -57,34 +57,48 @@ Made by [Indigo Labs Studio](https://indigolabs.studio).
 
 ## Development
 
-Requires Node.js 20 or later.
+Requires Node.js 22 or later. The repository is an npm workspace: the web app lives at the root and the geometry
+engine is published separately as [`@indigolabsltd/applique-core`](packages/core), so other projects can build the same
+templates.
 
 ```bash
 npm install
 npm run dev        # start the dev server
-npm test           # geometry, mesh and nesting tests
-npm run typecheck
+npm test           # geometry, mesh and nesting tests (in packages/core)
+npm run typecheck  # app and core
 npm run build      # static site in dist/
+npm run build:core # compile the core package to packages/core/dist
 ```
 
 The UI is React 19 + TypeScript + Vite, styled with Tailwind CSS v4 and [shadcn/ui](https://ui.shadcn.com) components
-(in `src/components/ui`). The 3D preview uses three.js and is loaded on demand.
+(in `src/components/ui`). The 3D preview uses three.js and is loaded on demand. In development the app compiles the
+core package straight from its source, so there is no build step between editing the two.
 
 ### Project layout
 
 ```
+packages/core/src/   @indigolabsltd/applique-core: runs in browsers and in Node
+  geometry.ts        glyph flattening, polygon clean-up and offsetting
+  templates.ts       builds a template (outline) for each character
+  shapes.ts          built-in shapes (hearts, stars, celebrations, festivals)
+  lattice.ts         filament saver: solid border with an open lattice inside
+  filament.ts        printed volume and weight, as a slicer prints it
+  mesh.ts            watertight extrusion
+  handle.ts          optional grip handle: placement and solid
+  nest.ts            plate optimiser
+  plates.ts          nesting output as per-plate layouts
+  printers.ts        printer presets and keep-out areas
+  export.ts          STL, 3MF, SVG and ZIP writers
+  fonts.ts           bundled font list, Google Fonts catalogue, font parsing
 src/
-  lib/
-    geometry.ts   glyph flattening, polygon clean-up and offsetting, built-in shapes
-    templates.ts  builds a template (outline) for each character
-    mesh.ts       watertight extrusion
-    handle.ts     optional grip handle: placement and solid
-    nest.ts       plate optimiser (runs in nest.worker.ts)
-    export.ts     STL, 3MF, SVG and ZIP writers
-    fonts.ts      bundled fonts and the Google Fonts catalogue
-    paper.ts      A4 paper templates
-  components/     app components; ui/ holds the shadcn components
+  lib/               app-only code: bundled font files, Web Worker, paper printing, downloads
+  components/        app components; ui/ holds the shadcn components
 ```
+
+### Releasing the core package
+
+Bump `version` in `packages/core/package.json`, then push a tag such as `core-v0.2.0`. The release workflow builds,
+tests and publishes the package to npm with provenance.
 
 ## Deploying
 
@@ -100,7 +114,7 @@ Ideas, bug reports and pull requests are very welcome. Some things on the wish l
 
 - A small engraved label on each template (useful for telling "b", "d", "p" and "q" apart).
 - Optional connecting bridges for letters with separate parts (the dot on an "i").
-- More shapes (flowers, bunting flags, leaves).
+- More shapes (leaves, animals, sports), and more festivals: suggestions welcome.
 
 ## Licence
 

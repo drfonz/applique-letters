@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Font } from "opentype.js";
+import type { Font } from "@indigolabsltd/applique-core";
 import { DropdownMenu, Popover } from "radix-ui";
 import { Loader2, TriangleAlert, Type, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,9 @@ import { SliderField } from "@/components/SliderField";
 import { ToggleRow } from "@/components/ToggleRow";
 import { usePacking } from "@/hooks/usePacking";
 import { BUNDLED_FONTS, cssFamily, loadFont, registerPreviewFace, type FontChoice } from "@/lib/fonts";
-import { downloadBlob, meshToStl, meshesTo3mf, regionsToPathData, zipFiles } from "@/lib/export";
-import { mergeMeshes } from "@/lib/mesh";
+import { meshToStl, meshesTo3mf, regionsToPathData, zipFiles } from "@indigolabsltd/applique-core";
+import { downloadBlob } from "@/lib/download";
+import { mergeMeshes } from "@indigolabsltd/applique-core";
 import {
   canPlaceHandle,
   handleVolume,
@@ -23,21 +24,33 @@ import {
   templateSolid,
   type HandlePlacement,
   type HandleSettings,
-} from "@/lib/handle";
-import { transformRegions, type Region, type Vec2 } from "@/lib/geometry";
-import { latticeRegions, type LatticeSettings } from "@/lib/lattice";
-import { FILAMENTS, formatGrams, grams as filamentGrams, printedHandleVolume, printedVolume } from "@/lib/filament";
-import type { NestOptions } from "@/lib/nest";
+} from "@indigolabsltd/applique-core";
+import { transformRegions, type Region, type Vec2 } from "@indigolabsltd/applique-core";
+import { latticeRegions, type LatticeSettings } from "@indigolabsltd/applique-core";
+import {
+  FILAMENTS,
+  formatGrams,
+  grams as filamentGrams,
+  printedHandleVolume,
+  printedVolume,
+} from "@indigolabsltd/applique-core";
+import type { NestOptions } from "@indigolabsltd/applique-core";
 import { printPaperTemplates } from "@/lib/paper";
-import { bedToTemplate, buildPlates, templateToBed, type PlacedLetter, type PlateLayout } from "@/lib/plates";
-import { PRINTERS, keepOutAreas } from "@/lib/printers";
+import {
+  bedToTemplate,
+  buildPlates,
+  templateToBed,
+  type PlacedLetter,
+  type PlateLayout,
+} from "@indigolabsltd/applique-core";
+import { PRINTERS, keepOutAreas } from "@indigolabsltd/applique-core";
 import {
   buildTemplates,
   countCharacters,
   thicknessOf,
   type LetterTemplate,
   type TemplateSettings,
-} from "@/lib/templates";
+} from "@indigolabsltd/applique-core";
 import { cn } from "@/lib/utils";
 
 // three.js is large, so the 3D view is only loaded when it is first opened.

@@ -1,5 +1,5 @@
-import { regionArea, type Region, type Vec2 } from "./geometry";
-import { extrudeRegions, mergeMeshes, type Mesh } from "./mesh";
+import { regionArea, type Region, type Vec2 } from "./geometry.js";
+import { extrudeRegions, mergeMeshes, type Mesh } from "./mesh.js";
 
 /**
  * Optional grip handle: a post standing up from the template so it can be held flat

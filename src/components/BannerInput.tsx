@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type CSSProperties } from "react";
-import { SHAPES } from "@/lib/shapes";
+import { SHAPES } from "@indigolabsltd/applique-core";
 import { cn } from "@/lib/utils";
 import { shapeTint } from "@/components/ShapePicker";
 

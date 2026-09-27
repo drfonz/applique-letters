@@ -1,21 +1,23 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-import opentype from "opentype.js";
-import { buildTemplates, countCharacters, thicknessOf, type TemplateSettings } from "../templates";
-import { extrudeRegions, meshVolume, mergeMeshes } from "../mesh";
-import { meshToStl, meshesTo3mf } from "../export";
-import { nest, placedRegions } from "../nest";
-import { PRINTERS, keepOutAreas } from "../printers";
-import { bedToTemplate, buildPlates, templateToBed } from "../plates";
-import { boundsOf, differenceRegions, regionArea, regionRings } from "../geometry";
-import { latticeRegions } from "../lattice";
-import { printedVolume } from "../filament";
-import { SHAPES, easterSunday, familiesInOrder } from "../shapes";
+import { buildTemplates, countCharacters, thicknessOf, type TemplateSettings } from "../templates.js";
+import { extrudeRegions, meshVolume, mergeMeshes } from "../mesh.js";
+import { meshToStl, meshesTo3mf } from "../export.js";
+import { nest, placedRegions } from "../nest.js";
+import { PRINTERS, keepOutAreas } from "../printers.js";
+import { bedToTemplate, buildPlates, templateToBed } from "../plates.js";
+import { boundsOf, differenceRegions, regionArea, regionRings } from "../geometry.js";
+import { latticeRegions } from "../lattice.js";
+import { printedVolume } from "../filament.js";
+import { SHAPES, SHAPE_GROUPS, easterSunday, familiesInOrder, shapesIn } from "../shapes.js";
+import { parseFont } from "../fonts.js";
+
+const require = createRequire(import.meta.url);
 
 function loadFont(file: string) {
-  const buf = readFileSync(resolve(__dirname, "../../../node_modules/@fontsource", file));
-  return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  const buf = readFileSync(require.resolve(`@fontsource/${file}`));
+  return parseFont(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 }
 
 const fredoka = loadFont("fredoka/files/fredoka-latin-700-normal.woff");
@@ -75,12 +77,16 @@ describe("templates", () => {
 
   it("draws every built-in shape as one printable piece", () => {
     const shapes = Object.keys(SHAPES);
+    // The moon and star are cut as two pieces, as the symbol is drawn.
+    const pieces = (c: string) => (c === "☪" ? 2 : 1);
     for (const settings of [base, { ...base, letterHeight: 30 }, { ...base, outlineOffset: -2 }]) {
       const { templates, missing } = buildTemplates(fredoka, shapes, settings);
       expect(missing).toEqual([]);
       expect(templates).toHaveLength(shapes.length);
       for (const tpl of templates)
-        expect(tpl.pieces, `${tpl.char} at ${settings.letterHeight} mm, ${settings.outlineOffset} mm offset`).toBe(1);
+        expect(tpl.pieces, `${tpl.char} at ${settings.letterHeight} mm, ${settings.outlineOffset} mm offset`).toBe(
+          pieces(tpl.char),
+        );
     }
     const { templates } = buildTemplates(fredoka, shapes, base);
     const holes = (c: string) => templates.find((t) => t.char === c)!.regions[0].holes.length;
@@ -88,15 +94,57 @@ describe("templates", () => {
     expect(holes("🎃")).toBe(4); // two eyes, a nose and a grin
     expect(holes("⛄")).toBe(6); // two eyes, a nose and three buttons
     expect(holes("❄")).toBe(1); // the hexagon in the middle
+    expect(holes("💍")).toBe(3); // inside each band, and where they overlap
+    expect(holes("🏵")).toBe(9); // the centre and a seed in each petal
+    expect(holes("✡")).toBe(1);
+    expect(holes("🌈")).toBe(2); // the gaps between the three bands
     expect(templates.find((t) => t.char === "👻")!.height).toBeCloseTo(100, 0);
     expect(templates.find((t) => t.char === "🦇")!.height).toBeCloseTo(60, 0);
     expect(templates.find((t) => t.char === "🎃")!.slug).toBe("pumpkin");
+    expect(templates.find((t) => t.char === "🕎")!.height).toBeCloseTo(80, 0);
+  });
+
+  it("gives every shape a file name and a sensible outline, chunky enough to cut round", () => {
+    const shapes = Object.keys(SHAPES);
+    const { templates } = buildTemplates(fredoka, shapes, { ...base, letterHeight: 75 });
+    for (const tpl of templates) {
+      expect(tpl.slug, tpl.char).toMatch(/^[a-z]+(-[a-z]+)*$/);
+      expect(tpl.area, tpl.char).toBeGreaterThan(0);
+      expect(tpl.width / tpl.height, tpl.char).toBeGreaterThan(0.4);
+      expect(tpl.width / tpl.height, tpl.char).toBeLessThan(2.5);
+    }
+    expect(new Set(templates.map((t) => t.slug)).size).toBe(shapes.length);
+    // Every part of the newer shapes is at least 6 mm across at 75 mm: shrinking by 3 mm neither
+    // splits a piece nor loses one.
+    const chunky = SHAPE_GROUPS.filter((f) => !["basic", "halloween", "christmas", "easter"].includes(f.id)).flatMap(
+      (f) => shapesIn(f.id),
+    );
+    for (const tpl of templates.filter((t) => chunky.includes(t.char))) {
+      const shrunk = cleanAndOffset(regionRings(tpl.regions), -3);
+      expect(shrunk.length, tpl.char).toBe(tpl.pieces);
+    }
   });
 
   it("lists the family in season first", () => {
     const order = (date: string) => familiesInOrder(new Date(date)).map((f) => f.id);
-    expect(order("2026-10-15")).toEqual(["halloween", "basic", "christmas", "easter"]);
-    expect(order("2026-12-01")).toEqual(["christmas", "basic", "halloween", "easter"]);
+    const rest = ["diwali", "eid", "hanukkah", "lunar-new-year", "pride"];
+    expect(order("2026-10-15")).toEqual([
+      "halloween",
+      "basic",
+      "celebration",
+      "wedding",
+      "baby",
+      "christmas",
+      "easter",
+      ...rest,
+    ]);
+    expect(order("2026-12-01").slice(0, 3)).toEqual(["christmas", "basic", "celebration"]);
+    // Pride Month is June; festivals on lunar calendars have no fixed season.
+    expect(order("2027-06-01")[0]).toBe("pride");
+    expect(order("2027-06-30")[0]).toBe("pride");
+    expect(order("2027-07-01")[0]).toBe("basic");
+    for (const id of ["celebration", "wedding", "baby", ...rest])
+      expect(shapesIn(id as never).length, id).toBeGreaterThan(0);
     expect(order("2027-01-03")[0]).toBe("christmas"); // still Christmas until Twelfth Night
     expect(order("2027-03-01")[0]).toBe("basic");
     // Easter moves: 5 April 2026, 28 March 2027, 16 April 2028.
@@ -114,6 +162,7 @@ describe("templates", () => {
   it("ignores the emoji variation selector that phone keyboards add", () => {
     expect([...countCharacters("BOO 👻\uFE0F🎃").keys()]).toEqual(["B", "O", "👻", "🎃"]);
     expect([...countCharacters("❄\uFE0F🕷\uFE0F").keys()]).toEqual(["❄", "🕷"]);
+    expect([...countCharacters("🕊\uFE0F☪\uFE0F✡\uFE0F🏵\uFE0F🕯\uFE0F").keys()]).toEqual(["🕊", "☪", "✡", "🏵", "🕯"]);
   });
 
   it("grows the outline by the offset", () => {
@@ -125,7 +174,7 @@ describe("templates", () => {
 
 describe("mesh", () => {
   it("extrudes watertight solids with the right volume", () => {
-    const { templates } = buildTemplates(fredoka, chars("ABOR♥i★8👻🎃🦇🕷🧙🎄🎁🪩❄⛄🌿🍭🥚🐰🐣"), base);
+    const { templates } = buildTemplates(fredoka, [...chars("ABORi8"), ...Object.keys(SHAPES)], base);
     const t = thicknessOf(base);
     for (const tpl of templates) {
       const mesh = extrudeRegions(tpl.regions, t);
@@ -251,7 +300,7 @@ describe("nesting", () => {
 });
 
 import ClipperLib from "clipper-lib";
-import { cleanAndOffset, type Region } from "../geometry";
+import { cleanAndOffset, type Region } from "../geometry.js";
 
 function intersectionArea(a: Region[], b: Region[], grow: number): number {
   const ga = cleanAndOffset(
@@ -283,7 +332,7 @@ function intersectionArea(a: Region[], b: Region[], grow: number): number {
   return regions.reduce((s, r) => s + Math.abs(regionArea(r)), 0) > 0.5 ? 1 : 0;
 }
 
-import { canPlaceHandle, handleMesh, placeHandle, templateSolid } from "../handle";
+import { canPlaceHandle, handleMesh, placeHandle, templateSolid } from "../handle.js";
 
 describe("grip handle", () => {
   const settings = { enabled: true, diameter: 12, height: 15 };
@@ -378,6 +427,17 @@ function insideRegion([px, py]: [number, number], region: Region): boolean {
 describe("filament-saving lattice", () => {
   const lattice = { enabled: true, border: 4, spacing: 10 };
   const area = (rs: Region[]) => rs.reduce((a, r) => a + regionArea(r), 0);
+
+  it("prints every built-in shape as a closed solid, lattice and all", () => {
+    const { templates } = buildTemplates(fredoka, Object.keys(SHAPES), { ...base, letterHeight: 75 });
+    for (const t of templates) {
+      expect(isWatertight(extrudeRegions(t.regions, 1.2).indices), t.char).toBe(true);
+      const body = latticeRegions(t.regions, lattice);
+      expect(area(body), t.char).toBeGreaterThan(0);
+      expect(area(body), t.char).toBeLessThanOrEqual(t.area + 0.01);
+      expect(isWatertight(extrudeRegions(body, 1.2).indices), t.char).toBe(true);
+    }
+  });
 
   it("keeps a solid border, opens the middle and stays printable, for every capital", () => {
     const { templates } = buildTemplates(fredoka, ALPHABET, base);

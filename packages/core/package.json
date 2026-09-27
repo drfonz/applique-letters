@@ -1,0 +1,61 @@
+{
+  "name": "@indigolabsltd/applique-core",
+  "version": "0.1.0",
+  "description": "Outline, lattice, grip handle, nesting and 3MF/STL export for appliqué letter templates",
+  "license": "MIT",
+  "author": "Indigo Labs Studio (https://indigolabs.studio)",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/__tests__"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "dependencies": {
+    "@types/clipper-lib": "^6.4.0",
+    "clipper-lib": "^6.4.2",
+    "earcut": "^3.2.3",
+    "fflate": "^0.8.3",
+    "opentype.js": "^2.0.0"
+  },
+  "devDependencies": {
+    "@fontsource/fredoka": "^5.3.0",
+    "@types/node": "^26.6.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/drfonz/applique-letters.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/drfonz/applique-letters#readme",
+  "keywords": [
+    "applique",
+    "quilting",
+    "3d-printing",
+    "3mf",
+    "stl",
+    "fonts",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

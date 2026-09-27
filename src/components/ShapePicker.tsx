@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Popover } from "radix-ui";
 import { Plus } from "lucide-react";
-import { SHAPES, familiesInOrder, shapesIn, type ShapeGroup } from "@/lib/shapes";
+import { SHAPES, familiesInOrder, shapesIn, type ShapeGroup } from "@indigolabsltd/applique-core";
 import { cn } from "@/lib/utils";
 
 /** The basics are plain glyphs rather than emoji, so give them the letter colours. */
@@ -145,11 +145,8 @@ export function ShapePicker({ onPick, selected, aside }: ShapePickerProps) {
                 </button>
               </Popover.Close>
             </div>
-            <div
-              className="flex gap-1 overflow-x-auto [scrollbar-width:none]"
-              role="tablist"
-              aria-label="Shape families"
-            >
+            {/* Wraps rather than scrolls: with a dozen families, a hidden scroll hid most of them. */}
+            <div className="flex flex-wrap gap-1" role="tablist" aria-label="Shape families">
               {tabs.map((t) => (
                 <button
                   key={t.id}

@@ -1,4 +1,4 @@
-import type { KeepOut } from "./nest";
+import type { KeepOut } from "./nest.js";
 
 export interface PrinterPreset {
   id: string;

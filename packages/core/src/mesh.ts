@@ -1,5 +1,5 @@
 import earcut from "earcut";
-import { signedArea, type Region, type Vec2 } from "./geometry";
+import { signedArea, type Region, type Vec2 } from "./geometry.js";
 
 /** An indexed triangle mesh in millimetres. */
 export interface Mesh {
