@@ -19,6 +19,8 @@ jobs:
           node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later; Node's bundled npm may lag behind.
+      - run: npm install -g npm@latest && npm --version
       - run: npm ci
       - name: Check the tag matches the package version
         run: test "core-v$(node -p 'require("./packages/core/package.json").version')" = "$GITHUB_REF_NAME"
